@@ -151,8 +151,12 @@ startup --host_jvm_args=-Dbazel.DigestFunction=SHA256
 
 build --define=build_with_onednn_v2=true
 
-# OSS specific flags
+# Use Keras 2 legacy mode
+common --action_env=TF_USE_LEGACY_KERAS=1
+
+# Filters
 build --build_tag_filters="-nokokoro,-requires-gpu-nvidia,-requires-jellyfish,-nopresubmit"
+test --test_sharding_strategy=disabled
 test --test_size_filters="small,medium,large" --test_timeout_filters="short,moderate,long"
 test --test_tag_filters="-nokokoro,-requires-gpu-nvidia,-requires-jellyfish,-nopresubmit"
 

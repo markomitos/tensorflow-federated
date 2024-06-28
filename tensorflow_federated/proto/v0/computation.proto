@@ -858,7 +858,7 @@ message Xla {
   // A serialized representation of XLA code to execute.
   //
   // Stores an `HloModuleProto` message, as defined in the TensorFlow repo in
-  // the file "tensorflow/compiler/xla/service/hlo.proto" in the main branch.
+  // the file "third_party/xla/xla/service/hlo.proto" in the main branch.
   //
   // It is recommended, albeit not required that the entry computation in this
   // module accepts its parameters as a single tuple.
