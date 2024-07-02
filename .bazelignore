@@ -1,0 +1,6 @@
+bazel-*
+.ijwb
+.clwb
+.vscode
+.idea
+.cache

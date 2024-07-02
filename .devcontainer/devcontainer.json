@@ -1,0 +1,35 @@
+{
+  "name": "TensorFlow Federated (DevContainer)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "cacheFrom": ["registry.jetbrains.team/p/fed/containers/tensorflow-federated-devcontainer:latest"],
+    "options": ["--pull"]
+  },
+  "features": {
+    "ghcr.io/stuartleeks/dev-container-features/shell-history" : {}
+  },
+  "mounts": [
+    { "target": "/root/.cache/bazelisk/", "source": "jetbrains-federated-devcontainer-cache-bazelisk", "type": "volume" },
+    { "target": "/root/.cache/bazel", "source": "jetbrains-federated-devcontainer-cache-bazel", "type": "volume" },
+    { "target": "/root/.cache/pip/", "source": "jetbrains-federated-devcontainer-cache-pip", "type": "volume" },
+    { "target": "/var/run/docker.sock", "source": "/var/run/docker.sock", "type": "bind" }
+  ],
+  "customizations": {
+    "jetbrains" : {
+      "backend": "PyCharm",
+      "plugins": ["com.intellij.ml.llm","mobi.hsz.idea.gitignore","com.google.idea.bazel.ijwb"],
+      "settings" : {
+        "Python.homePath": "/usr/bin/python3"
+      }
+    }
+  },
+  "containerUser": "root",
+  "postCreateCommand": ".devcontainer/post-create.sh",
+  "postStartCommand": "pip install -e .",
+  "waitFor": "postStartCommand",
+  "containerEnv":  {
+    // Temporary fix until these properties are provided by DevContainer plugin
+    "_REMOTE_USER": "root",
+    "_REMOTE_USER_HOME": "/root"
+  }
+}
