@@ -22,7 +22,7 @@ from absl import logging
 import tensorflow as tf
 import tf_keras
 
-from tensorflow_federated.python.common_libs import py_typecheck
+from tensorflow_federated.python.common_libs import py_typecheck, keras_compat
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
 from tensorflow_federated.python.core.impl.federated_context import intrinsics
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -31,14 +31,16 @@ from tensorflow_federated.python.core.impl.types import type_conversions
 from tensorflow_federated.python.learning.metrics import counters
 from tensorflow_federated.python.learning.metrics import keras_finalizer
 from tensorflow_federated.python.learning.models import variable
+import keras
 
 Loss = Union[tf_keras.losses.Loss, list[tf_keras.losses.Loss]]
+Model = Union[tf_keras.Model, keras.Model]
 
 
 # TODO: b/197746608 - Remove the code path that takes in constructed Keras
 # metrics, because reconstructing metrics via `from_config` can cause problems.
 def from_keras_model(
-    keras_model: tf_keras.Model,
+    keras_model: Model,
     loss: Loss,
     input_spec,
     loss_weights: Optional[list[float]] = None,
@@ -46,6 +48,8 @@ def from_keras_model(
         Union[
             list[tf_keras.metrics.Metric],
             list[Callable[[], tf_keras.metrics.Metric]],
+            list[keras.metrics.Metric],
+            list[Callable[[], keras.metrics.Metric]],
         ]
     ] = None,
 ) -> variable.VariableModel:
@@ -118,8 +122,8 @@ def from_keras_model(
       contain keys `'x'` and `'y'`.
   """.format(variable.MODEL_ARG_NAME, variable.MODEL_LABEL_NAME)
   # Validate `keras_model`
-  py_typecheck.check_type(keras_model, tf_keras.Model)
-  if keras_model._is_compiled:  # pylint: disable=protected-access
+  py_typecheck.check_type(keras_model, (keras.Model, tf_keras.Model))
+  if keras_compat.is_compiled(keras_model): #keras_model._is_compiled:  # pylint: disable=protected-access
     raise ValueError('`keras_model` must not be compiled')
 
   # Validate and normalize `loss` and `loss_weights`
@@ -210,7 +214,7 @@ def from_keras_model(
       break
 
   return _KerasModel(
-      keras_model,
+      keras_model=keras_model,
       input_spec=input_spec,
       loss_fns=loss,
       loss_weights=loss_weights,
@@ -314,7 +318,7 @@ class _KerasModel(variable.VariableModel):
 
   def __init__(
       self,
-      keras_model: tf_keras.Model,
+      keras_model: Model,
       input_spec,
       loss_fns: list[tf_keras.losses.Loss],
       loss_weights: list[float],

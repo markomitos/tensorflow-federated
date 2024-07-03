@@ -19,6 +19,7 @@ from typing import Any, NamedTuple, Union
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.common_libs import py_typecheck
 from tensorflow_federated.python.common_libs import structure
@@ -60,7 +61,7 @@ class ModelWeights(NamedTuple):
       model: A `tf_keras.Model` or `tff.learning.models.VariableModel` instance
         to assign the weights to.
     """
-    py_typecheck.check_type(model, (variable.VariableModel, tf_keras.Model))
+    py_typecheck.check_type(model, (variable.VariableModel, tf_keras.Model, keras.Model))
     if isinstance(model, tf_keras.Model):
       # We do not use `tf.nest.map_structure` here because
       # tf_keras.Model.*weights are always flat lists and we want to be flexible

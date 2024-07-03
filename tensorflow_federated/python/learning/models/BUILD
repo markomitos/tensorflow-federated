@@ -77,6 +77,7 @@ py_library(
     srcs = ["keras_utils.py"],
     deps = [
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/core/environments/tensorflow_frontend:tensorflow_computation",
         "//tensorflow_federated/python/core/impl/federated_context:intrinsics",
