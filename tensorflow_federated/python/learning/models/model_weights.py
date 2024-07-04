@@ -41,7 +41,7 @@ class ModelWeights(NamedTuple):
 
   @classmethod
   def from_model(cls, model):
-    py_typecheck.check_type(model, (variable.VariableModel, tf_keras.Model))
+    py_typecheck.check_type(model, (variable.VariableModel, tf_keras.Model, keras.Model))
     return cls(model.trainable_variables, model.non_trainable_variables)
 
   @classmethod
@@ -53,7 +53,7 @@ class ModelWeights(NamedTuple):
     )
 
   def assign_weights_to(
-      self, model: Union[variable.VariableModel, tf_keras.Model]
+      self, model: Union[variable.VariableModel, tf_keras.Model, keras.Model]
   ) -> None:
     """Assign these TFF model weights to the weights of a model.
 
@@ -62,7 +62,7 @@ class ModelWeights(NamedTuple):
         to assign the weights to.
     """
     py_typecheck.check_type(model, (variable.VariableModel, tf_keras.Model, keras.Model))
-    if isinstance(model, tf_keras.Model):
+    if isinstance(model, (tf_keras.Model,keras.Model)):
       # We do not use `tf.nest.map_structure` here because
       # tf_keras.Model.*weights are always flat lists and we want to be flexible
       # between sequence types (e.g. tuple/list). `tf.nest` wille error if
