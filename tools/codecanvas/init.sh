@@ -12,14 +12,14 @@ echo "Installing IDE plugins..."
   "mobi.hsz.idea.gitignore" || true
 
 bazel_plugin=""
-if [ "$CODECANVAS_JETBRAINS_IDE" = "clion" ]; then
+if [ "$CANVAS_IDE_TYPE_ID" = "CLion" ]; then
   bazel_plugin="clwb"
-elif [ "$CODECANVAS_JETBRAINS_IDE" = "idea" ] || [ "$CODECANVAS_JETBRAINS_IDE" = "pycharm" ]; then
+elif [ "$CANVAS_IDE_TYPE_ID" = "Idea" ] || [ "$CANVAS_IDE_TYPE_ID" = "PyCharm" ]; then
   bazel_plugin="ijwb"
-elif [ -z "$CODECANVAS_JETBRAINS_IDE" ]; then
-  echo "CODECANVAS_JETBRAINS_IDE is not set. Set it to 'clion', 'idea' or 'pycharm' to install the correct Bazel plugin."
+elif [ -z "$CANVAS_IDE_TYPE_ID" ]; then
+  echo "CANVAS_IDE_TYPE_ID is not set. Set it to 'CLion', 'Idea' or 'PyCharm' to install the correct Bazel plugin."
 else
-  echo "CODECANVAS_JETBRAINS_IDE is set to an unknown value: $CODECANVAS_JETBRAINS_IDE. Set it to 'clion', 'idea' or 'pycharm' to install the correct Bazel plugin."
+  echo "CANVAS_IDE_TYPE_ID is set to an unknown value: '$CANVAS_IDE_TYPE_ID'. Set it to 'CLion', 'Idea' or 'PyCharm' to install the correct Bazel plugin."
 fi
 
 if [ -n "$bazel_plugin" ]; then
