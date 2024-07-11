@@ -20,6 +20,7 @@ from absl.testing import parameterized
 import attrs
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -108,7 +109,7 @@ class LinearModel(reconstruction_model.ReconstructionModel):
     )
 
 
-class BiasLayer(tf.keras.layers.Layer):
+class BiasLayer(tf_keras.layers.Layer):
   """Adds a bias to inputs."""
 
   def build(self, input_shape):
@@ -122,12 +123,12 @@ class BiasLayer(tf.keras.layers.Layer):
 
 def keras_linear_model_fn():
   """Should produce the same results as `LinearModel`."""
-  inputs = tf.keras.layers.Input(shape=[1])
-  scaled_input = tf.keras.layers.Dense(
+  inputs = tf_keras.layers.Input(shape=[1])
+  scaled_input = tf_keras.layers.Dense(
       1, use_bias=False, kernel_initializer='zeros'
   )(inputs)
   outputs = BiasLayer()(scaled_input)
-  keras_model = tf.keras.Model(inputs=inputs, outputs=outputs)
+  keras_model = tf_keras.Model(inputs=inputs, outputs=outputs)
   input_spec = _create_input_spec()
   return reconstruction_model.ReconstructionModel.from_keras_model_and_layers(
       keras_model=keras_model,
@@ -137,8 +138,8 @@ def keras_linear_model_fn():
   )
 
 
-class NumOverCounter(tf.keras.metrics.Sum):
-  """A `tf.keras.metrics.Metric` that counts examples greater than a constant.
+class NumOverCounter(tf_keras.metrics.Sum):
+  """A `tf_keras.metrics.Metric` that counts examples greater than a constant.
 
   This metric counts label examples greater than a threshold.
   """
@@ -180,7 +181,7 @@ def _get_tff_optimizer(learning_rate=0.1):
 
 
 def _get_keras_optimizer_fn(learning_rate=0.1):
-  return lambda: tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  return lambda: tf_keras.optimizers.SGD(learning_rate=learning_rate)
 
 
 class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
@@ -197,7 +198,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_no_split_data(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -311,7 +312,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_split_data(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -411,7 +412,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       self, model_fn, optimizer_fn
   ):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -518,7 +519,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_recon_lr_0(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -631,7 +632,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_skip_recon(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -744,7 +745,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       self, model_fn, optimizer_fn
   ):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     dataset_split_fn = (
         reconstruction_model.ReconstructionModel.build_dataset_split_fn(
@@ -839,7 +840,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_fed_recon_eval_custom_stateful_broadcaster(self, model_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -967,7 +968,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
     mock_model_fn = mock.Mock(side_effect=keras_linear_model_fn)
 
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     fed_recon_eval.build_fed_recon_eval(model_fn=mock_model_fn, loss_fn=loss_fn)
     # TODO: b/186451541 - Reduce the number of calls to model_fn.

@@ -18,6 +18,7 @@ from collections.abc import Callable
 from typing import Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.baselines import client_spec
 
@@ -46,24 +47,24 @@ def _create_model(is_training):
     A keras model that can do random transformations on the images.
   """
   if is_training:
-    return tf.keras.Sequential([
-        tf.keras.layers.RandomCrop(IMAGE_SIZE, IMAGE_SIZE),
-        tf.keras.layers.RandomFlip('horizontal'),
-        tf.keras.layers.Rescaling(
+    return tf_keras.Sequential([
+        tf_keras.layers.RandomCrop(IMAGE_SIZE, IMAGE_SIZE),
+        tf_keras.layers.RandomFlip('horizontal'),
+        tf_keras.layers.Rescaling(
             scale=2.0 / 255, offset=-1.0
         ),  # rescale the values to the range of [-1.0, 1.0]
     ])
   else:
-    return tf.keras.Sequential([
-        tf.keras.layers.CenterCrop(IMAGE_SIZE, IMAGE_SIZE),
-        tf.keras.layers.Rescaling(
+    return tf_keras.Sequential([
+        tf_keras.layers.CenterCrop(IMAGE_SIZE, IMAGE_SIZE),
+        tf_keras.layers.Rescaling(
             scale=2.0 / 255, offset=-1.0
         ),  # rescale the values to the range of [-1.0, 1.0]
     ])
 
 
 def _map_fn(
-    element: collections.OrderedDict[str, tf.Tensor], model: tf.keras.Model
+    element: collections.OrderedDict[str, tf.Tensor], model: tf_keras.Model
 ) -> tuple[tf.Tensor, tf.Tensor]:
   """Preprocesses an image for training/eval using Keras data augmentation.
 

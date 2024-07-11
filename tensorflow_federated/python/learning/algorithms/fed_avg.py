@@ -33,6 +33,7 @@ from typing import Optional, Union
 
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.aggregators import factory
 from tensorflow_federated.python.aggregators import factory_utils
@@ -62,11 +63,11 @@ def build_weighted_fed_avg(
         Callable[[], variable.VariableModel], functional.FunctionalModel
     ],
     client_optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer]
     ],
     server_optimizer_fn: Union[
         optimizer_base.Optimizer,
-        Callable[[], tf.keras.optimizers.Optimizer],
+        Callable[[], tf_keras.optimizers.Optimizer],
         None,
     ] = None,
     *,
@@ -131,11 +132,11 @@ def build_weighted_fed_avg(
       returning the same pre-constructed model each call will result in an
       error.
     client_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`. If `model_fn` is a
+      callable that returns a `tf_keras.Optimizer`. If `model_fn` is a
       `tff.learning.models.FunctionalModel`, _must_ be a
       `tff.learning.optimizers.Optimizer`.
     server_optimizer_fn: A `tff.learning.optimizers.Optimizer`, a no-arg
-      callable that returns a `tf.keras.Optimizer`, or None. By default, this
+      callable that returns a `tf_keras.Optimizer`, or None. By default, this
       uses `tff.leanring.optimizers.build_sgdm` with a learning rate of 1.0. If
       `model_fn` is a `tff.learning.models.FunctionalModel`, _must_ be a
       `tff.learning.optimizers.Optimizer`.
@@ -283,11 +284,11 @@ def build_unweighted_fed_avg(
         Callable[[], variable.VariableModel], functional.FunctionalModel
     ],
     client_optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer]
     ],
     server_optimizer_fn: Union[
         optimizer_base.Optimizer,
-        Callable[[], tf.keras.optimizers.Optimizer],
+        Callable[[], tf_keras.optimizers.Optimizer],
         None,
     ] = None,
     model_distributor: Optional[distributors.DistributionProcess] = None,
@@ -346,11 +347,11 @@ def build_unweighted_fed_avg(
       returning the same pre-constructed model each call will result in an
       error.
     client_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`. If `model_fn` is a
+      callable that returns a `tf_keras.Optimizer`. If `model_fn` is a
       `tff.learning.models.FunctionalModel`, _must_ be a
       `tff.learning.optimizers.Optimizer`.
     server_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`. By default, this uses
+      callable that returns a `tf_keras.Optimizer`. By default, this uses
       `tff.learning.optimizers.build_sgdm` with a learning rate of 1.0. If
       `model_fn` is a `tff.learning.models.FunctionalModel`, _must_ be a
       `tff.learning.optimizers.Optimizer`.

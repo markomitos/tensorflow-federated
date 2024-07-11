@@ -17,6 +17,7 @@ import copy
 
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.optimizers import optimizer as optimizer_base
 from tensorflow_federated.python.learning.optimizers import optimizer_test_utils
@@ -167,7 +168,7 @@ class SGDTest(optimizer_test_utils.TestCase, parameterized.TestCase):
     tff_optimizer_fn = lambda: sgdm.build_sgdm(learning_rate, momentum)
 
     def keras_optimizer_fn():
-      return tf.keras.optimizers.SGD(learning_rate, momentum)
+      return tf_keras.optimizers.SGD(learning_rate, momentum)
 
     self.assert_optimizers_numerically_close(
         model_variables_fn, gradients, tff_optimizer_fn, keras_optimizer_fn

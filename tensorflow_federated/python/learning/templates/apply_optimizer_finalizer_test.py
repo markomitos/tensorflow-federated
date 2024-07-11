@@ -18,6 +18,7 @@ import copy
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -78,7 +79,7 @@ class ApplyOptimizerFinalizerComputationTest(
 ):
 
   def test_initialize_has_expected_type_with_keras_optimizer(self):
-    optimizer_fn = lambda: tf.keras.optimizers.legacy.SGD(learning_rate=1.0)
+    optimizer_fn = lambda: tf_keras.optimizers.legacy.SGD(learning_rate=1.0)
 
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
         optimizer_fn, _MODEL_WEIGHTS_TYPE
@@ -94,7 +95,7 @@ class ApplyOptimizerFinalizerComputationTest(
     )
 
   def test_next_has_expected_type_with_keras_optimizer(self):
-    optimizer_fn = lambda: tf.keras.optimizers.legacy.SGD(learning_rate=1.0)
+    optimizer_fn = lambda: tf_keras.optimizers.legacy.SGD(learning_rate=1.0)
 
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
         optimizer_fn, _MODEL_WEIGHTS_TYPE
@@ -130,7 +131,7 @@ class ApplyOptimizerFinalizerComputationTest(
     )
 
   def test_get_hparams_has_expected_type_with_keras_optimizer(self):
-    optimizer_fn = lambda: tf.keras.optimizers.legacy.SGD(learning_rate=1.0)
+    optimizer_fn = lambda: tf_keras.optimizers.legacy.SGD(learning_rate=1.0)
 
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
         optimizer_fn, _MODEL_WEIGHTS_TYPE
@@ -146,7 +147,7 @@ class ApplyOptimizerFinalizerComputationTest(
     )
 
   def test_set_hparams_has_expected_type_with_keras_optimizer(self):
-    optimizer_fn = lambda: tf.keras.optimizers.legacy.SGD(learning_rate=1.0)
+    optimizer_fn = lambda: tf_keras.optimizers.legacy.SGD(learning_rate=1.0)
 
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
         optimizer_fn, _MODEL_WEIGHTS_TYPE
@@ -285,7 +286,7 @@ class ApplyOptimizerFinalizerComputationTest(
       )
 
   def test_unexpected_optimizer_fn_raises(self):
-    optimizer = tf.keras.optimizers.SGD(1.0)
+    optimizer = tf_keras.optimizers.SGD(1.0)
     with self.assertRaises(TypeError):
       apply_optimizer_finalizer.build_apply_optimizer_finalizer(
           optimizer, _SERVER_MODEL_WEIGHTS_TYPE.member
@@ -295,7 +296,7 @@ class ApplyOptimizerFinalizerComputationTest(
       ('tff_optimizer', sgdm.build_sgdm(1.0)),
       (
           'keras_optimizer',
-          lambda: tf.keras.optimizers.legacy.SGD(learning_rate=1.0),
+          lambda: tf_keras.optimizers.legacy.SGD(learning_rate=1.0),
       ),
   )
   def test_custom_should_reject_update_builds(self, optimizer_fn):
@@ -328,7 +329,7 @@ class ApplyOptimizerFinalizerExecutionTest(tf.test.TestCase):
       )
 
   def test_execution_with_keras_sgd_optimizer(self):
-    server_optimizer_fn = lambda: tf.keras.optimizers.legacy.SGD(1.0)
+    server_optimizer_fn = lambda: tf_keras.optimizers.legacy.SGD(1.0)
     # Note that SGD only maintains a counter of how many times it has been
     # called. No other state is used.
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
@@ -353,7 +354,7 @@ class ApplyOptimizerFinalizerExecutionTest(tf.test.TestCase):
     init_fn, next_fn = (
         apply_optimizer_finalizer._build_keras_optimizer_initialize_and_next(
             _MODEL_WEIGHTS_TYPE,
-            optimizer_fn=tf.keras.optimizers.SGD,
+            optimizer_fn=tf_keras.optimizers.SGD,
             should_reject_update=apply_optimizer_finalizer.reject_non_finite_update,
         )
     )
@@ -415,7 +416,7 @@ class ApplyOptimizerFinalizerExecutionTest(tf.test.TestCase):
     init_fn, next_fn = (
         apply_optimizer_finalizer._build_keras_optimizer_initialize_and_next(
             _MODEL_WEIGHTS_TYPE,
-            optimizer_fn=tf.keras.optimizers.Adam,
+            optimizer_fn=tf_keras.optimizers.Adam,
             should_reject_update=_get_should_reject_update_fn(10),
         )
     )
@@ -524,7 +525,7 @@ class ApplyOptimizerFinalizerExecutionTest(tf.test.TestCase):
     momentum = 0.5
 
     def server_optimizer_fn():
-      return tf.keras.optimizers.SGD(learning_rate=1.0, momentum=0.5)
+      return tf_keras.optimizers.SGD(learning_rate=1.0, momentum=0.5)
 
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
         server_optimizer_fn, _SERVER_MODEL_WEIGHTS_TYPE.member
@@ -550,7 +551,7 @@ class ApplyOptimizerFinalizerExecutionTest(tf.test.TestCase):
       weights = output.result
 
   def test_get_hparams_with_keras_optimizer(self):
-    optimizer = lambda: tf.keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
+    optimizer = lambda: tf_keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
         optimizer, _SERVER_MODEL_WEIGHTS_TYPE.member
     )
@@ -563,7 +564,7 @@ class ApplyOptimizerFinalizerExecutionTest(tf.test.TestCase):
     self.assertDictEqual(hparams, expected_hparams)
 
   def test_set_hparams_with_keras_optimizer(self):
-    optimizer = lambda: tf.keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
+    optimizer = lambda: tf_keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(
         optimizer, _SERVER_MODEL_WEIGHTS_TYPE.member
     )

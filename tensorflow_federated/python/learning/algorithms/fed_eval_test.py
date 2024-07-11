@@ -20,6 +20,7 @@ from unittest import mock
 from absl.testing import absltest
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -469,7 +470,7 @@ class FunctionalFedEvalProcessTest(tf.test.TestCase):
   def test_functional_evaluation_matches_non_functional(self):
     datasets = self.create_test_datasets()
     batch_type = computation_types.tensorflow_to_type(datasets[0].element_spec)
-    loss_fn = tf.keras.losses.MeanSquaredError
+    loss_fn = tf_keras.losses.MeanSquaredError
     keras_model_fn = functools.partial(
         model_examples.build_linear_regression_keras_functional_model,
         feature_dims=2,
@@ -489,7 +490,7 @@ class FunctionalFedEvalProcessTest(tf.test.TestCase):
     # Defining artifacts using `tff.learning.models.FunctionalModel`
     def build_metrics_fn():
       return collections.OrderedDict(
-          loss=tf.keras.metrics.MeanSquaredError(),
+          loss=tf_keras.metrics.MeanSquaredError(),
           num_examples=counters.NumExamplesCounter(),
           num_batches=counters.NumBatchesCounter(),
       )

@@ -18,6 +18,7 @@ from unittest import mock
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -54,12 +55,12 @@ class ProximalClientWorkComputationTest(
       ),
       (
           'keras_uniform',
-          lambda: tf.keras.optimizers.SGD(1.0),
+          lambda: tf_keras.optimizers.SGD(1.0),
           client_weight_lib.ClientWeighting.UNIFORM,
       ),
       (
           'keras_num_examples',
-          lambda: tf.keras.optimizers.SGD(1.0),
+          lambda: tf_keras.optimizers.SGD(1.0),
           client_weight_lib.ClientWeighting.NUM_EXAMPLES,
       ),
   )
@@ -125,7 +126,7 @@ class ProximalClientWorkComputationTest(
     with self.assertRaises(TypeError):
       proximal_client_work.build_model_delta_client_work(
           model_examples.LinearRegression,
-          tf.keras.optimizers.SGD(1.0),
+          tf_keras.optimizers.SGD(1.0),
           client_weighting=client_weight_lib.ClientWeighting.NUM_EXAMPLES,
           delta_l2_regularizer=0.1,
       )
@@ -194,7 +195,7 @@ class ProximalClientWorkExecutionTest(tf.test.TestCase, parameterized.TestCase):
         )
     )
     keras_result = client_update_keras(
-        tf.keras.optimizers.SGD(learning_rate=0.1),
+        tf_keras.optimizers.SGD(learning_rate=0.1),
         create_test_initial_weights(),
         dataset,
     )
@@ -262,7 +263,7 @@ class ProximalClientWorkExecutionTest(tf.test.TestCase, parameterized.TestCase):
             use_experimental_simulation_loop=simulation,
         )
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, **optimizer_kwargs)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.1, **optimizer_kwargs)
     dataset = create_test_dataset()
     client_result, model_output = self.evaluate(
         client_tf(optimizer, create_test_initial_weights(), dataset)
@@ -287,7 +288,7 @@ class ProximalClientWorkExecutionTest(tf.test.TestCase, parameterized.TestCase):
             delta_l2_regularizer=0.1,
         )
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.1)
     dataset = create_test_dataset()
     init_weights = create_test_initial_weights()
     init_weights.trainable[1] = bad_value
@@ -353,7 +354,7 @@ class ProximalClientWorkExecutionTest(tf.test.TestCase, parameterized.TestCase):
             use_experimental_simulation_loop=simulation,
         )
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.1)
     dataset = create_test_dataset()
     client_tf(optimizer, create_test_initial_weights(), dataset)
     if simulation:
@@ -363,7 +364,7 @@ class ProximalClientWorkExecutionTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('tff_optimizer', sgdm.build_sgdm(1.0)),
-      ('keras_optimizer', lambda: tf.keras.optimizers.SGD(1.0)),
+      ('keras_optimizer', lambda: tf_keras.optimizers.SGD(1.0)),
   )
   def test_delta_regularizer_yields_smaller_model_delta(self, optimizer):
     small_delta_process = proximal_client_work.build_model_delta_client_work(
@@ -404,8 +405,8 @@ class ProximalClientWorkExecutionTest(tf.test.TestCase, parameterized.TestCase):
   @parameterized.named_parameters(
       ('tff_simple', sgdm.build_sgdm(1.0)),
       ('tff_momentum', sgdm.build_sgdm(1.0, momentum=0.9)),
-      ('keras_simple', lambda: tf.keras.optimizers.SGD(1.0)),
-      ('keras_momentum', lambda: tf.keras.optimizers.SGD(1.0, momentum=0.9)),
+      ('keras_simple', lambda: tf_keras.optimizers.SGD(1.0)),
+      ('keras_momentum', lambda: tf_keras.optimizers.SGD(1.0, momentum=0.9)),
   )
   def test_execution_with_optimizer(self, optimizer):
     client_work_process = proximal_client_work.build_model_delta_client_work(

@@ -17,6 +17,7 @@ from typing import Any
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.test import execution_contexts
 from tensorflow_federated.python.core.impl.federated_context import federated_computation
@@ -36,7 +37,7 @@ _UNUSED_UNFINALIZED_METRICS = collections.OrderedDict(
 )
 
 
-class CustomSumMetric(tf.keras.metrics.Sum):
+class CustomSumMetric(tf_keras.metrics.Sum):
   """A custom metric whose result is total + extra scalar and vector values."""
 
   def __init__(self, name='custom_sum_metric'):
@@ -61,7 +62,7 @@ _TEST_ARGUMENTS_KERAS_METRICS = {
     # different shapes.
     'metric_finalizers': collections.OrderedDict(
         accuracy=keras_finalizer.create_keras_metric_finalizer(
-            tf.keras.metrics.SparseCategoricalAccuracy
+            tf_keras.metrics.SparseCategoricalAccuracy
         ),
         custom_sum=keras_finalizer.create_keras_metric_finalizer(
             CustomSumMetric
@@ -104,7 +105,7 @@ def _test_finalize_metrics(
 ) -> collections.OrderedDict[str, Any]:
   return collections.OrderedDict(
       accuracy=keras_finalizer.create_keras_metric_finalizer(
-          tf.keras.metrics.SparseCategoricalAccuracy
+          tf_keras.metrics.SparseCategoricalAccuracy
       )(unfinalized_metrics['accuracy']),
       custom_sum=keras_finalizer.create_keras_metric_finalizer(CustomSumMetric)(
           unfinalized_metrics['custom_sum']
@@ -401,7 +402,7 @@ class SecureSumThenFinalizeTest(parameterized.TestCase, tf.test.TestCase):
   def test_user_value_ranges_returns_correct_results(self):
     metric_finalizers = collections.OrderedDict(
         accuracy=keras_finalizer.create_keras_metric_finalizer(
-            tf.keras.metrics.SparseCategoricalAccuracy
+            tf_keras.metrics.SparseCategoricalAccuracy
         ),
         custom_sum=keras_finalizer.create_keras_metric_finalizer(
             CustomSumMetric
@@ -582,7 +583,7 @@ class SecureSumThenFinalizeTest(parameterized.TestCase, tf.test.TestCase):
     )
 
   def test_user_value_ranges_fails_invalid_dtype(self):
-    class TestConcatMetric(tf.keras.metrics.Metric):
+    class TestConcatMetric(tf_keras.metrics.Metric):
       """A custom metric that concatenates strings."""
 
       def __init__(self, name='custom_concat_metric'):
@@ -623,7 +624,7 @@ class SecureSumThenFinalizeTest(parameterized.TestCase, tf.test.TestCase):
   def test_user_value_ranges_fails_not_2_tuple(self):
     metric_finalizers = collections.OrderedDict(
         accuracy=keras_finalizer.create_keras_metric_finalizer(
-            tf.keras.metrics.SparseCategoricalAccuracy
+            tf_keras.metrics.SparseCategoricalAccuracy
         )
     )
     with self.assertRaisesRegex(ValueError, 'must be defined as a 2-tuple'):

@@ -17,6 +17,7 @@ import collections
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.aggregators import mean
 from tensorflow_federated.python.aggregators import sum_factory
@@ -337,7 +338,7 @@ class VanillaFedAvgTest(tf.test.TestCase, parameterized.TestCase):
       )
       return keras_utils.from_keras_model(
           keras_model,
-          loss=tf.keras.losses.MeanSquaredError(),
+          loss=tf_keras.losses.MeanSquaredError(),
           input_spec=collections.OrderedDict(
               x=tf.TensorSpec(shape=[None, 2]), y=tf.TensorSpec(shape=[None, 1])
           ),

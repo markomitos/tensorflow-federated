@@ -24,6 +24,7 @@ import tempfile
 import traceback
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.datasets import client_data
 from tensorflow_federated.python.simulation.datasets import from_tensor_slices_client_data
@@ -234,14 +235,14 @@ def _create_mini_gld_dataset(
   Returns:
     A tuple of `ClientData`, `tf.data.Dataset`.
   """
-  train_path = tf.keras.utils.get_file(
+  train_path = tf_keras.utils.get_file(
       MINI_GLD_TRAIN_SPLIT_FILE,
       origin=MINI_GLD_TRAIN_DOWNLOAD_URL,
       file_hash=MINI_GLD_TRAIN_SPLIT_FILE_MD5_CHECKSUM,
       hash_algorithm='md5',
       cache_dir=cache_dir,
   )
-  test_path = tf.keras.utils.get_file(
+  test_path = tf_keras.utils.get_file(
       MINI_GLD_TEST_SPLIT_FILE,
       origin=MINI_GLD_TEST_DOWNLOAD_URL,
       file_hash=MINI_GLD_TEST_SPLIT_FILE_MD5_CHECKSUM,
@@ -287,7 +288,7 @@ def _filter_images(
   with tempfile.TemporaryDirectory() as tmp_dir:
     logger = logging.getLogger(LOGGER)
     logger.info('Start to download checksum for shard %s', shard_str)
-    md5_path = tf.keras.utils.get_file(
+    md5_path = tf_keras.utils.get_file(
         'images_md5_%s.txt' % shard_str,
         origin=images_md5_url,
         cache_dir=tmp_dir,
@@ -300,7 +301,7 @@ def _filter_images(
       raise IOError(msg)
     logger.info('Downloaded checksum for shard %s successfully.', shard_str)
     logger.info('Start to download data for shard %s', shard_str)
-    tf.keras.utils.get_file(
+    tf_keras.utils.get_file(
         'images_%s.tar' % shard_str,
         origin=images_tar_url,
         file_hash=md5_hash,
@@ -342,7 +343,7 @@ def _download_data(
   """
   logger = logging.getLogger(LOGGER)
   logger.info('Start to download fed gldv2 mapping files')
-  path = tf.keras.utils.get_file(
+  path = tf_keras.utils.get_file(
       '%s.zip' % FED_GLD_SPLIT_FILE_BUNDLE,
       origin=FED_GLD_SPLIT_FILE_DOWNLOAD_URL,
       file_hash=FED_GLD_SPLIT_FILE_BUNDLE_MD5_CHECKSUM,

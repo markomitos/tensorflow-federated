@@ -17,7 +17,7 @@ import collections
 import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
-
+import tf_keras
 
 def construct_example_training_comp() -> tff.learning.templates.LearningProcess:
   """Constructs a `tff.learning.templates.LearningProcess` via the FL API."""
@@ -30,9 +30,9 @@ def construct_example_training_comp() -> tff.learning.templates.LearningProcess:
 
   def model_fn():
     """Constructs keras model."""
-    keras_model = tf.keras.models.Sequential(
+    keras_model = tf_keras.models.Sequential(
         [
-            tf.keras.layers.Dense(
+            tf_keras.layers.Dense(
                 1,
                 activation=tf.nn.softmax,
                 kernel_initializer='zeros',
@@ -44,13 +44,13 @@ def construct_example_training_comp() -> tff.learning.templates.LearningProcess:
     return tff.learning.models.from_keras_model(
         keras_model,
         input_spec=input_spec,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+        loss=tf_keras.losses.SparseCategoricalCrossentropy(),
+        metrics=[tf_keras.metrics.SparseCategoricalAccuracy()],
     )
 
   return tff.learning.algorithms.build_weighted_fed_avg(
       model_fn,
-      client_optimizer_fn=lambda: tf.keras.optimizers.SGD(learning_rate=0.01),
+      client_optimizer_fn=lambda: tf_keras.optimizers.SGD(learning_rate=0.01),
   )
 
 

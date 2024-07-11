@@ -17,6 +17,7 @@ import copy
 
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.optimizers import adam
 from tensorflow_federated.python.learning.optimizers import optimizer as optimizer_base
@@ -129,7 +130,7 @@ class AdamTest(optimizer_test_utils.TestCase, parameterized.TestCase):
     model_variables_fn = lambda: [tf.Variable(v) for v in intial_weight]
     gradients = [random_vector() for _ in range(steps)]
     tff_optimizer_fn = lambda: adam.build_adam(0.01, 0.9, 0.999)
-    keras_optimizer_fn = lambda: tf.keras.optimizers.Adam(0.01, 0.9, 0.999)
+    keras_optimizer_fn = lambda: tf_keras.optimizers.Adam(0.01, 0.9, 0.999)
 
     self.assert_optimizers_numerically_close(
         model_variables_fn, gradients, tff_optimizer_fn, keras_optimizer_fn

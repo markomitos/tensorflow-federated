@@ -30,6 +30,7 @@ import functools
 from typing import Any, Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.aggregators import mean
 from tensorflow_federated.python.common_libs import py_typecheck
@@ -61,7 +62,7 @@ def build_fed_recon_eval(
     loss_fn: fed_recon.LossFn,
     metrics_fn: Optional[fed_recon.MetricsFn] = None,
     reconstruction_optimizer_fn: fed_recon.OptimizerFn = functools.partial(
-        tf.keras.optimizers.SGD, learning_rate=0.1
+        tf_keras.optimizers.SGD, learning_rate=0.1
     ),
     dataset_split_fn: Optional[
         reconstruction_model.ReconstructionDatasetSplitFn
@@ -91,17 +92,17 @@ def build_fed_recon_eval(
       Tensorflow tensors or variables and use them. Must be constructed entirely
       from scratch on each invocation, returning the same pre-constructed model
       each call will result in an error.
-    loss_fn: A no-arg function returning a `tf.keras.losses.Loss` to use to
+    loss_fn: A no-arg function returning a `tf_keras.losses.Loss` to use to
       reconstruct and evaluate the model. The loss will be applied to the
       model's outputs during the evaluation stage. The final loss metric is the
       example-weighted mean loss across batches (and across clients).
-    metrics_fn: A no-arg function returning a list of `tf.keras.metrics.Metric`s
+    metrics_fn: A no-arg function returning a list of `tf_keras.metrics.Metric`s
       to evaluate the model. The metrics will be applied to the model's outputs
       during the evaluation stage. Final metric values are the example-weighted
       mean of metric values across batches (and across clients). If None, no
       metrics are applied.
     reconstruction_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a
-      no-arg function that returns a `tf.keras.optimizers.Optimizer` used to
+      no-arg function that returns a `tf_keras.optimizers.Optimizer` used to
       reconstruct the local variables with the global ones frozen.
     dataset_split_fn: A `tff.learning.models.ReconstructionDatasetSplitFn`
       taking in a single TF dataset and producing two TF datasets. The first is
@@ -183,7 +184,7 @@ def build_fed_recon_eval(
             client_model
         )
     )
-    loss_metric = tf.keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
+    loss_metric = tf_keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
     if metrics_fn is None:
       metrics = [loss_metric]
     else:

@@ -14,6 +14,7 @@
 
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -49,12 +50,12 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
     can still be written in a functional manner.
 
     Args:
-      momentum: Momentum parameter to be used in tf.keras.optimizers.SGD.
+      momentum: Momentum parameter to be used in tf_keras.optimizers.SGD.
     """
     init_w, fn, grad_fn = optimizer_test_utils.test_quadratic_problem()
     weights = init_w()
     self.assertGreater(fn(weights), 5.0)
-    optimizer_fn = lambda: tf.keras.optimizers.SGD(0.1, momentum=momentum)
+    optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1, momentum=momentum)
 
     @tensorflow_computation.tf_computation()
     def initialize_fn():
@@ -103,12 +104,12 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
     can still be written in a functional manner.
 
     Args:
-      momentum: Momentum parameter to be used in tf.keras.optimizers.SGD.
+      momentum: Momentum parameter to be used in tf_keras.optimizers.SGD.
     """
     init_w, fn, grad_fn = optimizer_test_utils.test_quadratic_problem()
     weights = init_w()
     self.assertGreater(fn(weights), 5.0)
-    optimizer_fn = lambda: tf.keras.optimizers.SGD(0.1, momentum=momentum)
+    optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1, momentum=momentum)
 
     @tf.function
     def training_loop(optimizer, variables):
@@ -135,7 +136,7 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_disjoint_init_and_next_false_keras_state_updated(self):
     """Tests optimizer state is updated inside of KerasOptimizer."""
-    optimizer_fn = lambda: tf.keras.optimizers.legacy.SGD(0.1)
+    optimizer_fn = lambda: tf_keras.optimizers.legacy.SGD(0.1)
 
     @tf.function
     def training_loop(optimizer, variables):
@@ -173,7 +174,7 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_spec(self, specs, disjoint_init_and_next):
     """Test compatibility with different structures of variables."""
-    optimizer_fn = lambda: tf.keras.optimizers.SGD(0.1)
+    optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1)
     variables = tf.nest.map_structure(
         lambda s: tf.Variable(tf.ones(s.shape, s.dtype)), specs
     )
@@ -202,7 +203,7 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
       ('nested_client', _NESTED_SPEC, False),
   )
   def test_build_tff_optimizer_keras(self, specs, disjoint_init_and_next):
-    optimizer_fn = lambda: tf.keras.optimizers.SGD(0.1)
+    optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1)
     variables = tf.nest.map_structure(
         lambda s: tf.Variable(tf.ones(s.shape, s.dtype)), specs
     )

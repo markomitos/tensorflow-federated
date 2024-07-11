@@ -14,6 +14,7 @@
 
 import attrs
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.simulation.baselines import baseline_task
@@ -42,18 +43,18 @@ def create_task_data():
 
 
 def keras_model_builder():
-  inputs = tf.keras.layers.Input(shape=(3,), name='input_layer')
-  outputs = tf.keras.layers.Dense(
+  inputs = tf_keras.layers.Input(shape=(3,), name='input_layer')
+  outputs = tf_keras.layers.Dense(
       2, kernel_initializer='ones', use_bias=False, name='dense_layer'
   )(inputs)
-  return tf.keras.models.Model(inputs=inputs, outputs=outputs, name='model')
+  return tf_keras.models.Model(inputs=inputs, outputs=outputs, name='model')
 
 
 def tff_model_builder():
   x_type = tf.TensorSpec(shape=(None, 1), dtype=tf.float32)
   input_spec = (x_type, x_type)
   keras_model = keras_model_builder()
-  loss = tf.keras.losses.MeanSquaredError()
+  loss = tf_keras.losses.MeanSquaredError()
   return keras_utils.from_keras_model(keras_model, loss, input_spec=input_spec)
 
 
@@ -86,16 +87,16 @@ class TaskUtilsTest(tf.test.TestCase):
         tf.TensorSpec(shape=(None, 4, 2), dtype=tf.float32, name=None),
         tf.TensorSpec(shape=(None, 4, 2), dtype=tf.float32, name=None),
     )
-    inputs = tf.keras.layers.Input(shape=(4, 2))
-    outputs = tf.keras.layers.Dense(
+    inputs = tf_keras.layers.Input(shape=(4, 2))
+    outputs = tf_keras.layers.Dense(
         2, kernel_initializer='ones', use_bias=False
     )(inputs)
-    keras_model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    keras_model = tf_keras.models.Model(inputs=inputs, outputs=outputs)
 
     def tff_model_fn():
       return keras_utils.from_keras_model(
           keras_model,
-          loss=tf.keras.losses.MeanSquaredError(),
+          loss=tf_keras.losses.MeanSquaredError(),
           input_spec=model_input_spec,
       )
 

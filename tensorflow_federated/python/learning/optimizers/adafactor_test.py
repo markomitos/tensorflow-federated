@@ -15,6 +15,7 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -124,7 +125,7 @@ class AdafactorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertSequenceEqual(tff_state['moments'][0].v.shape, test_shape)
 
     tff_weights = tf.zeros(shape=test_shape)
-    keras_optimizer = tf.keras.optimizers.Adafactor(**optimizer_kwargs)
+    keras_optimizer = tf_keras.optimizers.Adafactor(**optimizer_kwargs)
     keras_variable = tf.Variable(initial_value=tff_weights, dtype=tf.float32)
     gradient = tf.ones_like(tff_weights) * -0.1
     for _ in range(10):
@@ -148,7 +149,7 @@ class AdafactorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertSequenceEqual(tff_state['moments'][0].v.shape, test_shape)
 
     tff_weights = tf.zeros(shape=test_shape)
-    keras_optimizer = tf.keras.optimizers.Adafactor(**optimizer_kwargs)
+    keras_optimizer = tf_keras.optimizers.Adafactor(**optimizer_kwargs)
     keras_variable = tf.Variable(initial_value=tff_weights, dtype=tf.float32)
     gradient = tf.ones_like(tff_weights) * -0.1
     for _ in range(10):

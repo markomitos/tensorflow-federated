@@ -15,6 +15,7 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -35,7 +36,7 @@ def wrap_tf_function_in_tff_tf_computation(metric, unfinalized_metric_type):
   return finalizer_computation
 
 
-class CustomMeanMetric(tf.keras.metrics.Mean):
+class CustomMeanMetric(tf_keras.metrics.Mean):
   """A custom metric whose result is total/(count + initial_count)."""
 
   def __init__(
@@ -51,7 +52,7 @@ class CustomMeanMetric(tf.keras.metrics.Mean):
     return config
 
 
-class CustomSumMetric(tf.keras.metrics.Sum):
+class CustomSumMetric(tf_keras.metrics.Sum):
   """A custom metric whose result is total + extra scalar and vector values."""
 
   def __init__(
@@ -81,8 +82,8 @@ class CustomSumMetric(tf.keras.metrics.Sum):
     return config
 
 
-class CustomCounter(tf.keras.metrics.Sum):
-  """A custom `tf.keras.metrics.Metric` with extra arguments in `__init__`."""
+class CustomCounter(tf_keras.metrics.Sum):
+  """A custom `tf_keras.metrics.Metric` with extra arguments in `__init__`."""
 
   def __init__(self, name='new_metric', arg1=0, dtype=tf.int64):
     super().__init__(name, dtype)
@@ -95,9 +96,9 @@ class CustomCounter(tf.keras.metrics.Sum):
 class FinalizerTest(parameterized.TestCase, tf.test.TestCase):
 
   @parameterized.named_parameters(
-      ('keras_metric', tf.keras.metrics.SparseCategoricalAccuracy()),
+      ('keras_metric', tf_keras.metrics.SparseCategoricalAccuracy()),
       ('custom_keras_metric', CustomMeanMetric(initial_count=0.0)),
-      ('keras_metric_constructor', tf.keras.metrics.SparseCategoricalAccuracy),
+      ('keras_metric_constructor', tf_keras.metrics.SparseCategoricalAccuracy),
   )
   def test_keras_metric_finalizer_returns_correct_result(self, metric):
     # The unfinalized accuracy contains two tensors `total` and `count`.
@@ -155,7 +156,7 @@ class FinalizerTest(parameterized.TestCase, tf.test.TestCase):
       ('tensor', tf.constant(1.0), 'found a non-callable'),
       (
           'loss_constructor',
-          tf.keras.losses.MeanSquaredError,
+          tf_keras.losses.MeanSquaredError,
           'found a callable',
       ),  # go/pyformat-break
       (
@@ -208,7 +209,7 @@ class FinalizerTest(parameterized.TestCase, tf.test.TestCase):
   ):
     # The expected unfinalized metric values for `SparseCategoricalAccuracy` is
     # a list of two `tf.Tensor`s and each has shape () and dtype tf.float32.
-    metric = tf.keras.metrics.SparseCategoricalAccuracy()
+    metric = tf_keras.metrics.SparseCategoricalAccuracy()
     with self.assertRaisesRegex(error_type, error_message):
       wrap_tf_function_in_tff_tf_computation(
           metric,

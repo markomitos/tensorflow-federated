@@ -14,6 +14,7 @@
 """Libraries of `tf.Keras` metrics used for baseline tasks."""
 
 import tensorflow as tf
+import tf_keras
 
 
 def _apply_mask(y_true, sample_weight, masked_tokens, dtype):
@@ -27,8 +28,8 @@ def _apply_mask(y_true, sample_weight, masked_tokens, dtype):
   return sample_weight
 
 
-class NumTokensCounter(tf.keras.metrics.Metric):
-  """A `tf.keras.metrics.Metric` that counts tokens seen after masking."""
+class NumTokensCounter(tf_keras.metrics.Metric):
+  """A `tf_keras.metrics.Metric` that counts tokens seen after masking."""
 
   def __init__(self, masked_tokens=None, name='num_tokens', dtype=tf.int64):
     super().__init__(name, dtype)
@@ -52,7 +53,7 @@ class NumTokensCounter(tf.keras.metrics.Metric):
     return config
 
 
-class MaskedCategoricalAccuracy(tf.keras.metrics.SparseCategoricalAccuracy):
+class MaskedCategoricalAccuracy(tf_keras.metrics.SparseCategoricalAccuracy):
   """An accuracy metric that masks some tokens."""
 
   def __init__(self, masked_tokens=None, name='accuracy', dtype=None):

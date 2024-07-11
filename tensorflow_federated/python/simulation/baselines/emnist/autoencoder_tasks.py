@@ -16,6 +16,7 @@
 from typing import Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -73,11 +74,11 @@ def create_autoencoder_task_from_datasets(
   def model_fn() -> variable.VariableModel:
     return keras_utils.from_keras_model(
         keras_model=emnist_models.create_autoencoder_model(),
-        loss=tf.keras.losses.MeanSquaredError(),
+        loss=tf_keras.losses.MeanSquaredError(),
         input_spec=task_datasets.element_type_structure,
         metrics=[
-            tf.keras.metrics.MeanSquaredError(),
-            tf.keras.metrics.MeanAbsoluteError(),
+            tf_keras.metrics.MeanSquaredError(),
+            tf_keras.metrics.MeanAbsoluteError(),
         ],
     )
 

@@ -19,6 +19,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
+import tf_keras
 
 from tensorflow_federated.python.tests import temperature_sensor_example
 from tensorflow_federated.python.tests import test_contexts
@@ -586,22 +587,22 @@ class KerasIntegrationTest(parameterized.TestCase):
     input_dim = x_train.shape[1]
 
     def model_fn():
-      model = tf.keras.models.Sequential([
-          tf.keras.layers.InputLayer(input_shape=(input_dim,)),
-          tf.keras.layers.Dense(
-              50, activity_regularizer=tf.keras.regularizers.l1(0.1)
+      model = tf_keras.models.Sequential([
+          tf_keras.layers.InputLayer(input_shape=(input_dim,)),
+          tf_keras.layers.Dense(
+              50, activity_regularizer=tf_keras.regularizers.l1(0.1)
           ),
-          tf.keras.layers.Dense(input_dim, activation='sigmoid'),
+          tf_keras.layers.Dense(input_dim, activation='sigmoid'),
       ])
       tff_model = tff.learning.models.from_keras_model(
           keras_model=model,
           input_spec=input_spec,
-          loss=tf.keras.losses.MeanSquaredError(),
+          loss=tf_keras.losses.MeanSquaredError(),
       )
       return tff_model
 
     trainer = tff.learning.algorithms.build_weighted_fed_avg(
-        model_fn, client_optimizer_fn=lambda: tf.keras.optimizers.SGD(0.1)
+        model_fn, client_optimizer_fn=lambda: tf_keras.optimizers.SGD(0.1)
     )
 
     state = trainer.initialize()

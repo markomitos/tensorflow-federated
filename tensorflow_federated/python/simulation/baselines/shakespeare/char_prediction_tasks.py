@@ -16,6 +16,7 @@
 from typing import Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -90,7 +91,7 @@ def create_character_prediction_task_from_datasets(
         keras_model=char_prediction_models.create_recurrent_model(
             vocab_size=VOCAB_LENGTH, sequence_length=sequence_length
         ),
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        loss=tf_keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         input_spec=task_datasets.element_type_structure,
         metrics=[
             keras_metrics.NumTokensCounter(masked_tokens=[pad_token]),

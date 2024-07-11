@@ -18,6 +18,7 @@ from typing import Any
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -35,7 +36,7 @@ def _test_functional_finalize_metrics(
 ) -> collections.OrderedDict[str, Any]:
   return collections.OrderedDict(
       accuracy=keras_finalizer.create_keras_metric_finalizer(
-          tf.keras.metrics.SparseCategoricalAccuracy
+          tf_keras.metrics.SparseCategoricalAccuracy
       )(unfinalized_metrics['accuracy'])
   )
 

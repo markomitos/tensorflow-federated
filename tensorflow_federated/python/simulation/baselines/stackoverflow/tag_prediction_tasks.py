@@ -16,6 +16,7 @@
 from typing import Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -29,9 +30,9 @@ from tensorflow_federated.python.simulation.datasets import stackoverflow
 
 
 def _build_logistic_regression_model(input_size: int, output_size: int):
-  return tf.keras.models.Sequential(
+  return tf_keras.models.Sequential(
       [
-          tf.keras.layers.Dense(
+          tf_keras.layers.Dense(
               output_size, activation='sigmoid', input_shape=(input_size,)
           )
       ]
@@ -91,13 +92,13 @@ def create_tag_prediction_task_from_datasets(
         keras_model=_build_logistic_regression_model(
             input_size=word_vocab_size, output_size=tag_vocab_size
         ),
-        loss=tf.keras.losses.BinaryCrossentropy(
-            from_logits=False, reduction=tf.keras.losses.Reduction.SUM
+        loss=tf_keras.losses.BinaryCrossentropy(
+            from_logits=False, reduction=tf_keras.losses.Reduction.SUM
         ),
         input_spec=task_datasets.element_type_structure,
         metrics=[
-            tf.keras.metrics.Precision(name='precision'),
-            tf.keras.metrics.Recall(top_k=5, name='recall_at_5'),
+            tf_keras.metrics.Precision(name='precision'),
+            tf_keras.metrics.Recall(top_k=5, name='recall_at_5'),
         ],
     )
 

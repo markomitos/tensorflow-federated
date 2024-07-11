@@ -18,6 +18,7 @@ from unittest import mock
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -50,7 +51,7 @@ class ModelDeltaClientWorkComputationTest(
   def test_initialize_has_expected_type_signature_with_keras_optimizer(
       self, weighting
   ):
-    optimizer_fn = lambda: tf.keras.optimizers.SGD(learning_rate=1.0)
+    optimizer_fn = lambda: tf_keras.optimizers.SGD(learning_rate=1.0)
     model_fn = model_examples.LinearRegression
 
     client_work_process = model_delta_client_work.build_model_delta_client_work(
@@ -72,7 +73,7 @@ class ModelDeltaClientWorkComputationTest(
   def test_next_has_expected_type_signature_with_keras_optimizer(
       self, weighting
   ):
-    optimizer_fn = lambda: tf.keras.optimizers.SGD(learning_rate=1.0)
+    optimizer_fn = lambda: tf_keras.optimizers.SGD(learning_rate=1.0)
     model_fn = model_examples.LinearRegression
 
     client_work_process = model_delta_client_work.build_model_delta_client_work(
@@ -210,7 +211,7 @@ class ModelDeltaClientWorkComputationTest(
   def test_get_hparams_has_expected_type_signature_with_keras_optimizer(
       self, weighting
   ):
-    optimizer = lambda: tf.keras.optimizers.SGD(learning_rate=1.0)
+    optimizer = lambda: tf_keras.optimizers.SGD(learning_rate=1.0)
     model_fn = model_examples.LinearRegression
 
     client_work_process = model_delta_client_work.build_model_delta_client_work(
@@ -234,7 +235,7 @@ class ModelDeltaClientWorkComputationTest(
   def test_set_hparams_has_expected_type_signature_with_keras_optimizer(
       self, weighting
   ):
-    optimizer = lambda: tf.keras.optimizers.SGD(learning_rate=1.0)
+    optimizer = lambda: tf_keras.optimizers.SGD(learning_rate=1.0)
     model_fn = model_examples.LinearRegression
 
     client_work_process = model_delta_client_work.build_model_delta_client_work(
@@ -309,7 +310,7 @@ class ModelDeltaClientWorkComputationTest(
     with self.assertRaises(TypeError):
       model_delta_client_work.build_model_delta_client_work(
           model_examples.LinearRegression,
-          tf.keras.optimizers.SGD(learning_rate=1.0),
+          tf_keras.optimizers.SGD(learning_rate=1.0),
           client_weighting=client_weight_lib.ClientWeighting.NUM_EXAMPLES,
       )
 
@@ -369,7 +370,7 @@ class ModelDeltaClientWorkExecutionTest(
         )
     )
     keras_result = client_update_keras(
-        tf.keras.optimizers.SGD(learning_rate=0.1),
+        tf_keras.optimizers.SGD(learning_rate=0.1),
         create_test_initial_weights(),
         dataset,
     )
@@ -436,7 +437,7 @@ class ModelDeltaClientWorkExecutionTest(
             use_experimental_simulation_loop=simulation,
         )
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, **optimizer_kwargs)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.1, **optimizer_kwargs)
     dataset = create_test_dataset()
     client_result, model_output = self.evaluate(
         client_tf(optimizer, create_test_initial_weights(), dataset)
@@ -465,7 +466,7 @@ class ModelDeltaClientWorkExecutionTest(
             weighting=client_weight_lib.ClientWeighting.NUM_EXAMPLES,
         )
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.1)
     dataset = create_test_dataset()
     init_weights = create_test_initial_weights()
     init_weights.trainable[1] = bad_value
@@ -489,7 +490,7 @@ class ModelDeltaClientWorkExecutionTest(
             weighting=client_weight_lib.ClientWeighting.NUM_EXAMPLES,
         )
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.1)
     init_weights = create_test_initial_weights()
     dataset_with_nan = tf.data.Dataset.from_tensor_slices(
         collections.OrderedDict(
@@ -572,7 +573,7 @@ class ModelDeltaClientWorkExecutionTest(
             use_experimental_simulation_loop=simulation,
         )
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.1)
     dataset = create_test_dataset()
     client_tf(optimizer, create_test_initial_weights(), dataset)
     if simulation:
@@ -583,10 +584,10 @@ class ModelDeltaClientWorkExecutionTest(
   @parameterized.named_parameters(
       ('tff_simple', sgdm.build_sgdm(learning_rate=1.0)),
       ('tff_momentum', sgdm.build_sgdm(learning_rate=1.0, momentum=0.9)),
-      ('keras_simple', lambda: tf.keras.optimizers.SGD(learning_rate=1.0)),
+      ('keras_simple', lambda: tf_keras.optimizers.SGD(learning_rate=1.0)),
       (
           'keras_momentum',
-          lambda: tf.keras.optimizers.SGD(learning_rate=1.0, momentum=0.9),
+          lambda: tf_keras.optimizers.SGD(learning_rate=1.0, momentum=0.9),
       ),
   )
   def test_execution_with_optimizer(self, optimizer):
@@ -618,7 +619,7 @@ class ModelDeltaClientWorkExecutionTest(
     self.assertDictEqual(hparams, expected_hparams)
 
   def test_get_hparams_returns_expected_result_with_keras_optimizer(self):
-    optimizer = lambda: tf.keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
+    optimizer = lambda: tf_keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
     client_work_process = model_delta_client_work.build_model_delta_client_work(
         create_model,
         optimizer,
@@ -646,7 +647,7 @@ class ModelDeltaClientWorkExecutionTest(
     self.assertDictEqual(state, hparams)
 
   def test_set_hparams_returns_expected_result_with_keras_optimizer(self):
-    optimizer = lambda: tf.keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
+    optimizer = lambda: tf_keras.optimizers.SGD(learning_rate=1.0, momentum=0.9)
     client_work_process = model_delta_client_work.build_model_delta_client_work(
         create_model,
         optimizer,
@@ -707,7 +708,7 @@ class FunctionalModelDeltaClientWorkExecutionTest(
     keras_model = model_examples.build_linear_regression_keras_functional_model(
         feature_dims=2
     )
-    loss_fn = tf.keras.losses.MeanSquaredError()
+    loss_fn = tf_keras.losses.MeanSquaredError()
     input_spec = dataset.element_spec
     functional_model = functional.functional_model_from_keras(
         keras_model, loss_fn=loss_fn, input_spec=input_spec
@@ -735,7 +736,7 @@ class FunctionalModelDeltaClientWorkExecutionTest(
               feature_dims=2
           )
       )
-      loss_fn = tf.keras.losses.MeanSquaredError()
+      loss_fn = tf_keras.losses.MeanSquaredError()
       input_spec = dataset.element_spec
       return keras_utils.from_keras_model(
           keras_model, loss=loss_fn, input_spec=input_spec
@@ -787,7 +788,7 @@ class FunctionalModelDeltaClientWorkExecutionTest(
     keras_model = model_examples.build_linear_regression_keras_functional_model(
         feature_dims=2
     )
-    loss_fn = tf.keras.losses.MeanSquaredError()
+    loss_fn = tf_keras.losses.MeanSquaredError()
     dataset = create_test_dataset()
     input_spec = dataset.element_spec
 

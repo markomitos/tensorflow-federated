@@ -19,6 +19,7 @@ from collections.abc import Callable, Iterable, Mapping
 from typing import Any, NamedTuple, Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.impl.types import computation_types
 from tensorflow_federated.python.learning.models import model_weights
@@ -316,7 +317,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
 
   @classmethod
   def read_metric_variables(
-      cls, metrics: list[tf.keras.metrics.Metric]
+      cls, metrics: list[tf_keras.metrics.Metric]
   ) -> collections.OrderedDict[str, list[tf.Tensor]]:
     """Reads values from Keras metric variables."""
     del cls  # Unused.
@@ -333,13 +334,13 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
   @classmethod
   def from_keras_model_and_layers(
       cls,
-      keras_model: tf.keras.Model,
+      keras_model: tf_keras.Model,
       *,  # Caller passes below args by name.
-      global_layers: Iterable[tf.keras.layers.Layer],
-      local_layers: Iterable[tf.keras.layers.Layer],
+      global_layers: Iterable[tf_keras.layers.Layer],
+      local_layers: Iterable[tf_keras.layers.Layer],
       input_spec: Any,
   ) -> 'ReconstructionModel':
-    """Builds a `tff.learning.models.ReconstructionModel` from a `tf.keras.Model`.
+    """Builds a `tff.learning.models.ReconstructionModel` from a `tf_keras.Model`.
 
     The `tff.learning.models.ReconstructionModel` returned by this function uses
     `keras_model` for its forward pass and autodifferentiation steps. During
@@ -349,7 +350,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
     layers, without overlap.
 
     Args:
-      keras_model: A `tf.keras.Model` object that is not compiled.
+      keras_model: A `tf_keras.Model` object that is not compiled.
       global_layers: Iterable of global layers to be aggregated across users.
         All trainable and non-trainable model variables that can be aggregated
         on the server should be included in these layers.
@@ -366,7 +367,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
       A `tff.learning.models.ReconstructionModel` object.
 
     Raises:
-      TypeError: If `keras_model` is not an instance of `tf.keras.Model`.
+      TypeError: If `keras_model` is not an instance of `tf_keras.Model`.
       ValueError: If `keras_model` was compiled, if `input_spec` has unexpected
         structure (e.g., has more than two elements), if `global_layers` or
         `local_layers` contains layers that are not in `keras_model`, or if
@@ -405,7 +406,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
   @classmethod
   def from_keras_model_and_variables(
       cls,
-      keras_model: tf.keras.Model,
+      keras_model: tf_keras.Model,
       *,  # Caller passes below args by name.
       global_trainable_variables: Iterable[tf.Variable],
       global_non_trainable_variables: Iterable[tf.Variable],
@@ -413,7 +414,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
       local_non_trainable_variables: Iterable[tf.Variable],
       input_spec: Any,
   ) -> 'ReconstructionModel':
-    """Builds a `tff.learning.models.ReconstructionModel` from a `tf.keras.Model`.
+    """Builds a `tff.learning.models.ReconstructionModel` from a `tf_keras.Model`.
 
     The `tff.learning.models.ReconstructionModel` returned by this function uses
     `keras_model` for its forward pass and autodifferentiation steps. During
@@ -431,7 +432,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
     factory method.
 
     Args:
-      keras_model: A `tf.keras.Model` object that is not compiled.
+      keras_model: A `tf_keras.Model` object that is not compiled.
       global_trainable_variables: The trainable variables to associate with the
         post-reconstruction phase.
       global_non_trainable_variables: The non-trainable variables to associate
@@ -450,7 +451,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
       A `tff.learning.models.ReconstructionModel` object.
 
     Raises:
-      TypeError: If `keras_model` is not an instance of `tf.keras.Model`.
+      TypeError: If `keras_model` is not an instance of `tf_keras.Model`.
       ValueError: If `keras_model` was compiled, if `keras_model` is not already
         built, if `input_spec` has unexpected structure (e.g., has more than two
         elements), if `global_layers` or `local_layers` contains layers that are
@@ -495,7 +496,7 @@ def _validate_input_spec(input_spec):
 
 
 class _KerasReconstructionModel(ReconstructionModel):
-  """Internal wrapper class for `tf.keras.Model` objects.
+  """Internal wrapper class for `tf_keras.Model` objects.
 
   Wraps uncompiled Keras models as `tff.learning.models.ReconstructionModel`s.
   Tracks global and local layers of the model. Parameters contained in global
@@ -508,16 +509,16 @@ class _KerasReconstructionModel(ReconstructionModel):
 
   def __init__(
       self,
-      inner_model: tf.keras.Model,
+      inner_model: tf_keras.Model,
       global_trainable_variables: Iterable[tf.Variable],
       global_non_trainable_variables: Iterable[tf.Variable],
       local_trainable_variables: Iterable[tf.Variable],
       local_non_trainable_variables: Iterable[tf.Variable],
       input_spec: computation_types.Type,
   ):
-    if not isinstance(inner_model, tf.keras.Model):
+    if not isinstance(inner_model, tf_keras.Model):
       raise TypeError(
-          'Expected `inner_model` to be type `tf.keras.Model`, '
+          'Expected `inner_model` to be type `tf_keras.Model`, '
           f'found {type(inner_model)}'
       )
     if inner_model._is_compiled:  # pylint: disable=protected-access

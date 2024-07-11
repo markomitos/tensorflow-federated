@@ -18,6 +18,7 @@ from unittest import mock
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.aggregators import factory_utils
 from tensorflow_federated.python.aggregators import mean
@@ -146,7 +147,7 @@ class MimeLiteClientWorkComputationTest(
     with self.assertRaises(TypeError):
       mime._build_mime_lite_client_work(
           model_examples.LinearRegression,
-          lambda: tf.keras.optimizers.SGD(1.0),
+          lambda: tf_keras.optimizers.SGD(1.0),
           client_weighting=client_weight_lib.ClientWeighting.NUM_EXAMPLES,
       )
 
@@ -672,9 +673,9 @@ class FunctionalMimeLiteTest(tf.test.TestCase, parameterized.TestCase):
     dataset = _create_dataset()
 
     def create_keras_model():
-      return tf.keras.Sequential([
-          tf.keras.layers.InputLayer(input_shape=(2,)),
-          tf.keras.layers.Dense(
+      return tf_keras.Sequential([
+          tf_keras.layers.InputLayer(input_shape=(2,)),
+          tf_keras.layers.Dense(
               units=1, kernel_initializer='zeros', bias_initializer='zeros'
           ),
       ])
@@ -682,10 +683,10 @@ class FunctionalMimeLiteTest(tf.test.TestCase, parameterized.TestCase):
     def create_functional_model():
       return functional.functional_model_from_keras(
           create_keras_model(),
-          loss_fn=tf.keras.losses.MeanSquaredError(),
+          loss_fn=tf_keras.losses.MeanSquaredError(),
           input_spec=dataset.element_spec,
           metrics_constructor=collections.OrderedDict(
-              loss=tf.keras.metrics.MeanSquaredError,
+              loss=tf_keras.metrics.MeanSquaredError,
               num_examples=counters.NumExamplesCounter,
               num_batches=counters.NumBatchesCounter,
           ),
@@ -694,7 +695,7 @@ class FunctionalMimeLiteTest(tf.test.TestCase, parameterized.TestCase):
     def create_tff_model():
       return keras_utils.from_keras_model(
           create_keras_model(),
-          loss=tf.keras.losses.MeanSquaredError(),
+          loss=tf_keras.losses.MeanSquaredError(),
           input_spec=dataset.element_spec,
       )
 

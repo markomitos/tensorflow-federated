@@ -19,6 +19,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.metrics import types
 
@@ -113,7 +114,7 @@ class VariableModel(metaclass=abc.ABCMeta):
     the input to `predict_on_batch`, and the second positional element the
     labels.
 
-    Similar in spirit to `tf.keras.models.Model.input_spec`.
+    Similar in spirit to `tf_keras.models.Model.input_spec`.
     """.format(
         MODEL_ARG_NAME, MODEL_LABEL_NAME
     )
@@ -216,7 +217,7 @@ class VariableModel(metaclass=abc.ABCMeta):
     The metric names returned by this method should be the same as those
     expected by the `metric_finalizers()`; one should be able to use the
     unfinalized values as input to the finalizers to get the finalized values.
-    Taking `tf.keras.metrics.CategoricalAccuracy` as an example, its unfinalized
+    Taking `tf_keras.metrics.CategoricalAccuracy` as an example, its unfinalized
     values can be a list of two tensors (from its state variables): `total` and
     `count`, and the finalizer function performs a `tf.math.divide_no_nan`.
 

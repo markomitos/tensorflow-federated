@@ -14,6 +14,7 @@
 
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.baselines.stackoverflow import word_prediction_models
 
@@ -92,7 +93,7 @@ class CreateRecurrentModelTest(tf.test.TestCase, parameterized.TestCase):
       model = word_prediction_models.create_recurrent_model(
           vocab_size=3, shared_embedding=True
       )
-      loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+      loss_fn = tf_keras.losses.SparseCategoricalCrossentropy(from_logits=True)
       with tf.GradientTape() as tape:
         predictions = model(batch_x, training=True)
         loss = loss_fn(y_true=batch_y, y_pred=predictions)

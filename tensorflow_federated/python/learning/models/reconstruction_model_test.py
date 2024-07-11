@@ -19,22 +19,23 @@ from typing import Optional
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.impl.types import computation_types
 from tensorflow_federated.python.learning.models import model_weights
 from tensorflow_federated.python.learning.models import reconstruction_model
 
 
-def _get_two_layer_model() -> tf.keras.Model:
-  return tf.keras.models.Sequential([
-      tf.keras.layers.Dense(
+def _get_two_layer_model() -> tf_keras.Model:
+  return tf_keras.models.Sequential([
+      tf_keras.layers.Dense(
           5,
           input_shape=(5,),
           activation=tf.nn.relu,
           kernel_initializer='zeros',
           bias_initializer='zeros',
       ),
-      tf.keras.layers.Dense(
+      tf_keras.layers.Dense(
           2,
           activation=tf.nn.relu,
           kernel_initializer='zeros',
@@ -43,17 +44,17 @@ def _get_two_layer_model() -> tf.keras.Model:
   ])
 
 
-def _get_encapsulated_layer_model() -> tf.keras.Model:
-  class _EncapsulatingLayer(tf.keras.layers.Layer):
+def _get_encapsulated_layer_model() -> tf_keras.Model:
+  class _EncapsulatingLayer(tf_keras.layers.Layer):
 
-    def __init__(self, layer_to_encapsulate: tf.keras.layers.Layer):
+    def __init__(self, layer_to_encapsulate: tf_keras.layers.Layer):
       super().__init__()
       self._layer_to_encapsulate = layer_to_encapsulate
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
       return self._layer_to_encapsulate(x)
 
-  class _EncapsulatedLayerModel(tf.keras.Model):
+  class _EncapsulatedLayerModel(tf_keras.Model):
     """A Keras model with more complex layer interaction, useful for testing."""
 
     def __init__(self):
@@ -65,7 +66,7 @@ def _get_encapsulated_layer_model() -> tf.keras.Model:
       # illuminate complications in separating Reconstruction global and local
       # variables purely via layer. These complications are shown via tests
       # below.
-      self.dense_to_encapsulate = tf.keras.layers.Dense(
+      self.dense_to_encapsulate = tf_keras.layers.Dense(
           5,
           input_shape=(5,),
           activation=tf.nn.relu,
@@ -73,7 +74,7 @@ def _get_encapsulated_layer_model() -> tf.keras.Model:
           bias_initializer='zeros',
       )
       self.encapsulated_dense = _EncapsulatingLayer(self.dense_to_encapsulate)
-      self.regular_dense = tf.keras.layers.Dense(
+      self.regular_dense = tf_keras.layers.Dense(
           2,
           activation=tf.nn.relu,
           kernel_initializer='zeros',
@@ -94,7 +95,7 @@ def _get_encapsulated_layer_model() -> tf.keras.Model:
   return _EncapsulatedLayerModel()
 
 
-def _get_unbuilt_model() -> tf.keras.Model:
+def _get_unbuilt_model() -> tf_keras.Model:
   """Gets Keras model instance that has not yet had it's `build()` method called."""
   return _get_encapsulated_layer_model()
 
@@ -366,7 +367,7 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     input_spec = _get_input_spec()
 
     # A layer that is *not* in the above Keras model.
-    random_other_layer = tf.keras.layers.Dense(42)
+    random_other_layer = tf_keras.layers.Dense(42)
     random_other_layer.build((42))
 
     with self.assertRaises(ValueError):
@@ -384,7 +385,7 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     input_spec = _get_input_spec()
 
     # A layer that is *not* in the above Keras model.
-    random_other_layer = tf.keras.layers.Dense(42)
+    random_other_layer = tf_keras.layers.Dense(42)
     random_other_layer.build((42))
 
     with self.assertRaises(ValueError):

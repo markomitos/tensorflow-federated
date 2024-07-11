@@ -21,6 +21,7 @@ import tensorflow as tf
 
 from tensorflow_federated.python.learning.metrics import counters
 from tensorflow_federated.python.learning.metrics import keras_utils
+import tf_keras
 
 # Names of Keras metrics to test.
 BINARY_METRIC_NAMES = [
@@ -115,7 +116,7 @@ class CreateFunctionalMetricTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(metric.result(), finalize(state))
 
   @parameterized.named_parameters(
-      (name, getattr(tf.keras.metrics, name)) for name in BINARY_METRIC_NAMES
+      (name, getattr(tf_keras.metrics, name)) for name in BINARY_METRIC_NAMES
   )
   def test_binary_metrics_graph(self, metric_constructor):
     with tf.Graph().as_default():
@@ -154,7 +155,7 @@ class CreateFunctionalMetricTest(tf.test.TestCase, parameterized.TestCase):
         )
 
   @parameterized.named_parameters(
-      (name, getattr(tf.keras.metrics, name)) for name in BINARY_METRIC_NAMES
+      (name, getattr(tf_keras.metrics, name)) for name in BINARY_METRIC_NAMES
   )
   def test_binary_metrics_eager(self, metric_constructor):
     metric = metric_constructor()
@@ -183,7 +184,7 @@ class CreateFunctionalMetricTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_non_default_metric(self):
     def metric_constructor():
-      return tf.keras.metrics.Precision(thresholds=[0.25, 0.5, 0.75])
+      return tf_keras.metrics.Precision(thresholds=[0.25, 0.5, 0.75])
 
     metric = metric_constructor()
     initialize, update, finalize = keras_utils.create_functional_metric_fns(
@@ -209,8 +210,8 @@ class CreateFunctionalMetricTest(tf.test.TestCase, parameterized.TestCase):
   def test_multiple_metrics_constructor(self):
     def metrics_constructor():
       return collections.OrderedDict(
-          precisions=tf.keras.metrics.Precision(thresholds=[0.25, 0.5, 0.75]),
-          accuracy=tf.keras.metrics.Accuracy(),
+          precisions=tf_keras.metrics.Precision(thresholds=[0.25, 0.5, 0.75]),
+          accuracy=tf_keras.metrics.Accuracy(),
       )
 
     metrics = metrics_constructor()
@@ -249,8 +250,8 @@ class CreateFunctionalMetricTest(tf.test.TestCase, parameterized.TestCase):
     )
 
   @parameterized.named_parameters(
-      ('sum', tf.keras.metrics.Sum),
-      ('mean', tf.keras.metrics.Mean),
+      ('sum', tf_keras.metrics.Sum),
+      ('mean', tf_keras.metrics.Mean),
   )
   def test_unary_metrics(self, metric_constructor):
     initialize, update, _ = keras_utils.create_functional_metric_fns(
@@ -271,9 +272,9 @@ class CreateFunctionalMetricTest(tf.test.TestCase, parameterized.TestCase):
     # construction.
     def metrics_constructor():
       return collections.OrderedDict(
-          precision_at_5=tf.keras.metrics.Precision(thresholds=[0.5]),
+          precision_at_5=tf_keras.metrics.Precision(thresholds=[0.5]),
           num_batches=counters.NumBatchesCounter(dtype=tf.int64),
-          accuracy=tf.keras.metrics.Accuracy(),
+          accuracy=tf_keras.metrics.Accuracy(),
           num_examples=counters.NumExamplesCounter(dtype=tf.int64),
       )
 

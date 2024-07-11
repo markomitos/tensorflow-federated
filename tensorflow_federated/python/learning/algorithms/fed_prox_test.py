@@ -17,6 +17,7 @@ from unittest import mock
 from absl.testing import absltest
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.aggregators import factory_utils
 from tensorflow_federated.python.core.templates import iterative_process
@@ -37,7 +38,7 @@ class FedProxConstructionTest(parameterized.TestCase):
 
   @parameterized.product(
       optimizer_fn=[
-          tf.keras.optimizers.SGD,
+          tf_keras.optimizers.SGD,
           sgdm.build_sgdm(learning_rate=0.1),
       ],
       aggregation_factory=[
@@ -100,7 +101,7 @@ class FedProxConstructionTest(parameterized.TestCase):
       fed_prox.build_weighted_fed_prox(
           model_fn=model,
           proximal_strength=1.0,
-          client_optimizer_fn=tf.keras.optimizers.SGD,
+          client_optimizer_fn=tf_keras.optimizers.SGD,
       )
 
   @mock.patch.object(fed_prox, 'build_weighted_fed_prox')
@@ -129,7 +130,7 @@ class FedProxConstructionTest(parameterized.TestCase):
       fed_prox.build_weighted_fed_prox(
           model_fn=model_examples.LinearRegression(),
           proximal_strength=1.0,
-          client_optimizer_fn=tf.keras.optimizers.SGD,
+          client_optimizer_fn=tf_keras.optimizers.SGD,
       )
 
   def test_raises_on_negative_proximal_strength(self):
@@ -137,7 +138,7 @@ class FedProxConstructionTest(parameterized.TestCase):
       fed_prox.build_weighted_fed_prox(
           model_fn=model_examples.LinearRegression,
           proximal_strength=-1.0,
-          client_optimizer_fn=tf.keras.optimizers.SGD,
+          client_optimizer_fn=tf_keras.optimizers.SGD,
       )
 
   def test_raises_on_invalid_distributor(self):
@@ -181,7 +182,7 @@ class FedProxConstructionTest(parameterized.TestCase):
     learning_process = fed_prox.build_weighted_fed_prox(
         model_fn,
         proximal_strength=1.0,
-        client_optimizer_fn=lambda: tf.keras.optimizers.SGD(1.0),
+        client_optimizer_fn=lambda: tf_keras.optimizers.SGD(1.0),
         model_aggregator=model_update_aggregator.secure_aggregator(
             weighted=True
         ),
@@ -196,7 +197,7 @@ class FedProxConstructionTest(parameterized.TestCase):
     learning_process = fed_prox.build_unweighted_fed_prox(
         model_fn,
         proximal_strength=1.0,
-        client_optimizer_fn=lambda: tf.keras.optimizers.SGD(1.0),
+        client_optimizer_fn=lambda: tf_keras.optimizers.SGD(1.0),
         model_aggregator=model_update_aggregator.secure_aggregator(
             weighted=False
         ),

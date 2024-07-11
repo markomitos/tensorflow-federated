@@ -27,6 +27,7 @@ from typing import Any, Optional, Union
 
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.aggregators import factory
 from tensorflow_federated.python.aggregators import mean
@@ -381,7 +382,7 @@ def _build_functional_fed_sgd_client_work(
   return client_works.ClientWorkProcess(init_fn, next_fn)
 
 
-DEFAULT_SERVER_OPTIMIZER_FN = lambda: tf.keras.optimizers.SGD(learning_rate=0.1)
+DEFAULT_SERVER_OPTIMIZER_FN = lambda: tf_keras.optimizers.SGD(learning_rate=0.1)
 
 
 def build_fed_sgd(
@@ -389,7 +390,7 @@ def build_fed_sgd(
         Callable[[], variable.VariableModel], functional.FunctionalModel
     ],
     server_optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer]
     ] = DEFAULT_SERVER_OPTIMIZER_FN,
     model_distributor: Optional[distributors.DistributionProcess] = None,
     model_aggregator: Optional[factory.WeightedAggregationFactory] = None,
@@ -428,7 +429,7 @@ def build_fed_sgd(
   dataset (without updating its model) to calculate, and averages the gradients
   based on their number of examples. These average gradients are then aggregated
   at the server, and are applied at the server using a
-  `tf.keras.optimizers.Optimizer`.
+  `tf_keras.optimizers.Optimizer`.
 
   This implements the original FedSGD algorithm in [McMahan et al.,
   2017](https://arxiv.org/abs/1602.05629).
@@ -442,7 +443,7 @@ def build_fed_sgd(
       returning the same pre-constructed model each call will result in an
       error.
     server_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`. The optimizer is used to
+      callable that returns a `tf_keras.Optimizer`. The optimizer is used to
       apply client updates to the server model.
     model_distributor: An optional `DistributionProcess` that distributes the
       model weights on the server to the clients. If set to `None`, the

@@ -17,6 +17,7 @@ from collections.abc import Callable
 from typing import Any, Optional, Union
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.optimizers import optimizer
 
@@ -49,7 +50,7 @@ class KerasOptimizer(optimizer.Optimizer):
 
   def __init__(
       self,
-      optimizer_fn: Callable[[], tf.keras.optimizers.Optimizer],
+      optimizer_fn: Callable[[], tf_keras.optimizers.Optimizer],
       weights: Any,
       disjoint_init_and_next: bool,
   ):
@@ -57,7 +58,7 @@ class KerasOptimizer(optimizer.Optimizer):
 
     Args:
       optimizer_fn: A no-arg callable that creates and returns a
-        `tf.keras.optimizers.Optimizer`.
+        `tf_keras.optimizers.Optimizer`.
       weights: A (possibly nested) structure of `tf.Variable` objects which are
         supposed to be modified during call to the `next` method of the
         optimizer.
@@ -105,7 +106,7 @@ class KerasOptimizer(optimizer.Optimizer):
 
 def build_or_verify_tff_optimizer(
     optimizer_fn: Union[
-        Callable[[], tf.keras.optimizers.Optimizer], optimizer.Optimizer
+        Callable[[], tf_keras.optimizers.Optimizer], optimizer.Optimizer
     ],
     trainable_weights: Optional[Any] = None,
     disjoint_init_and_next: Optional[bool] = None,
@@ -114,13 +115,13 @@ def build_or_verify_tff_optimizer(
 
   This helper function is used for `tff.learning` to provide backward
   compatibility of accepting an argument of a no-arg callable returns a
-  `tf.keras.optimizers.Optimizer`. Keras optimizer has to be eagerly created in
+  `tf_keras.optimizers.Optimizer`. Keras optimizer has to be eagerly created in
   each TFF computation function. If the input `optimizer_fn` is already
   a `tff.learning.optimizers.Optimizer`, it will be directly returned.
 
   Args:
     optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-argument
-      callable that constructs and returns a `tf.keras.optimizers.Optimizer`.
+      callable that constructs and returns a `tf_keras.optimizers.Optimizer`.
     trainable_weights: Optional if `optimizer_fn` is a
       `tff.learning.optimizers.Optimizer`. A (possibly nested) structure of
       `tf.Variable` objects used to eagerly initialize Keras optimizers if

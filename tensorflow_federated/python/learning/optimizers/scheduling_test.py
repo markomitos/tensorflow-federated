@@ -14,6 +14,7 @@
 
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.optimizers import adagrad
 from tensorflow_federated.python.learning.optimizers import adam
@@ -65,7 +66,7 @@ class ScheduledLROptimizerTest(parameterized.TestCase, tf.test.TestCase):
     self.assertIsInstance(scheduled_optimizer, optimizer_base.Optimizer)
 
   def test_keras_optimizer_raises(self):
-    keras_optimizer = tf.keras.optimizers.SGD(1.0)
+    keras_optimizer = tf_keras.optimizers.SGD(1.0)
     with self.assertRaises(TypeError):
       scheduling.schedule_learning_rate(keras_optimizer, _example_schedule_fn)
 

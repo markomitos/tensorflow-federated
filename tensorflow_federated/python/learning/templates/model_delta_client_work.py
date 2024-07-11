@@ -24,6 +24,7 @@ from collections.abc import Callable, Mapping
 from typing import Any, Optional, Union
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.common_libs import py_typecheck
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -53,11 +54,11 @@ def build_model_delta_update_with_tff_optimizer(
 ):
   """Creates client update logic in FedAvg using a TFF optimizer.
 
-  In contrast to using a `tf.keras.optimizers.Optimizer`, we avoid creating
+  In contrast to using a `tf_keras.optimizers.Optimizer`, we avoid creating
   `tf.Variable`s associated with the optimizer state within the scope of the
   client work, as they are not necessary. This also means that the client's
   model weights are updated by computing `optimizer.next` and then assigning
-  the result to the model weights (while a `tf.keras.optimizers.Optimizer` will
+  the result to the model weights (while a `tf_keras.optimizers.Optimizer` will
   modify the model weight in place using `optimizer.apply_gradients`).
 
   Args:
@@ -162,7 +163,7 @@ def build_model_delta_update_with_tff_optimizer(
 def build_model_delta_update_with_keras_optimizer(
     model_fn, weighting, use_experimental_simulation_loop: bool = False
 ):
-  """Creates client update logic in FedAvg using a `tf.keras` optimizer.
+  """Creates client update logic in FedAvg using a `tf_keras` optimizer.
 
   In contrast to using a `tff.learning.optimizers.Optimizer`, we have to
   maintain `tf.Variable`s associated with the optimizer state within the scope
@@ -258,7 +259,7 @@ def _choose_client_weight(weighting, has_non_finite_delta, num_examples):
 def build_model_delta_client_work(
     model_fn: Callable[[], variable.VariableModel],
     optimizer: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer]
     ],
     client_weighting: client_weight_lib.ClientWeighting,
     metrics_aggregator: Optional[types.MetricsAggregatorType] = None,
@@ -269,13 +270,13 @@ def build_model_delta_client_work(
 
   This client work is constructed in slightly different manners depending on
   whether `optimizer` is a `tff.learning.optimizers.Optimizer`, or a no-arg
-  callable returning a `tf.keras.optimizers.Optimizer`.
+  callable returning a `tf_keras.optimizers.Optimizer`.
 
   If it is a `tff.learning.optimizers.Optimizer`, we avoid creating
   `tf.Variable`s associated with the optimizer state within the scope of the
   client work, as they are not necessary. This also means that the client's
   model weights are updated by computing `optimizer.next` and then assigning
-  the result to the model weights (while a `tf.keras.optimizers.Optimizer` will
+  the result to the model weights (while a `tf_keras.optimizers.Optimizer` will
   modify the model weight in place using `optimizer.apply_gradients`).
 
   Args:
@@ -285,7 +286,7 @@ def build_model_delta_client_work(
       constructed entirely from scratch on each invocation, returning the same
       pre-constructed model each call will result in an error.
     optimizer: A `tff.learning.optimizers.Optimizer`, or a no-arg callable that
-      returns a `tf.keras.Optimizer`. If using a `tf.keras.Optimizer`, the
+      returns a `tf_keras.Optimizer`. If using a `tf_keras.Optimizer`, the
       resulting process will have no hyperparameters in its state (ie.
       `process.get_hparams` will return an empty dictionary), while if using a
       `tff.learning.optimizers.Optimizer`, the process will have the same
@@ -309,7 +310,7 @@ def build_model_delta_client_work(
   ):
     raise TypeError(
         'Provided optimizer must a either a tff.learning.optimizers.Optimizer '
-        'or a no-arg callable returning an tf.keras.optimizers.Optimizer.'
+        'or a no-arg callable returning an tf_keras.optimizers.Optimizer.'
     )
 
   if metrics_aggregator is None:

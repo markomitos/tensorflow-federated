@@ -17,6 +17,7 @@ import enum
 from typing import Optional, Union
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -44,8 +45,8 @@ def _get_character_recognition_model(
     model_id: Union[str, CharacterRecognitionModel],
     only_digits: bool,
     debug_seed: Optional[int] = None,
-) -> tf.keras.Model:
-  """Constructs a `tf.keras.Model` for character recognition."""
+) -> tf_keras.Model:
+  """Constructs a `tf_keras.Model` for character recognition."""
   try:
     model_enum = CharacterRecognitionModel(model_id)
   except ValueError as e:
@@ -137,9 +138,9 @@ def create_character_recognition_task_from_datasets(
         keras_model=_get_character_recognition_model(
             model_id, only_digits, debug_seed
         ),
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        loss=tf_keras.losses.SparseCategoricalCrossentropy(),
         input_spec=task_datasets.element_type_structure,
-        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+        metrics=[tf_keras.metrics.SparseCategoricalAccuracy()],
     )
 
   return baseline_task.BaselineTask(task_datasets, model_fn)

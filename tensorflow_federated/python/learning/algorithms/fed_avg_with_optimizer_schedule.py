@@ -20,6 +20,7 @@ from typing import Optional, Union
 
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.aggregators import factory
 from tensorflow_federated.python.aggregators import mean
@@ -46,7 +47,7 @@ from tensorflow_federated.python.learning.templates import learning_process
 from tensorflow_federated.python.learning.templates import model_delta_client_work
 
 TFFOrKerasOptimizer = Union[
-    optimizer_base.Optimizer, tf.keras.optimizers.Optimizer
+    optimizer_base.Optimizer, tf_keras.optimizers.Optimizer
 ]
 
 
@@ -78,7 +79,7 @@ def build_scheduled_client_work(
       client work will call `optimizer_fn(learning_rate_fn(round_num))` where
       `round_num` is the integer round number.
     optimizer_fn: A callable accepting a float learning rate, and returning a
-      `tff.learning.optimizers.Optimizer` or a `tf.keras.Optimizer`. If
+      `tff.learning.optimizers.Optimizer` or a `tf_keras.Optimizer`. If
       `model_fn` is a `FunctionalModel`, must be a
       `tff.learning.optimizers.Optimizer`.
     metrics_aggregator: A function that takes in the metric finalizers (i.e.,
@@ -203,7 +204,7 @@ def build_weighted_fed_avg_with_optimizer_schedule(
     client_optimizer_fn: Callable[[float], TFFOrKerasOptimizer],
     server_optimizer_fn: Union[
         optimizer_base.Optimizer,
-        Callable[[], tf.keras.optimizers.Optimizer],
+        Callable[[], tf_keras.optimizers.Optimizer],
         None,
     ] = None,
     model_distributor: Optional[distributors.DistributionProcess] = None,
@@ -256,7 +257,7 @@ def build_weighted_fed_avg_with_optimizer_schedule(
   thoughout local training. The aggregate model delta is applied at the server
   using a server optimizer.
 
-  Note: the default server optimizer function is `tf.keras.optimizers.SGD`
+  Note: the default server optimizer function is `tf_keras.optimizers.SGD`
   with a learning rate of 1.0, which corresponds to adding the model delta to
   the current server model. This recovers the original FedAvg algorithm in
   [McMahan et al., 2017](https://arxiv.org/abs/1602.05629). More
@@ -278,9 +279,9 @@ def build_weighted_fed_avg_with_optimizer_schedule(
       called on the resulting process. Also note that this function must be
       serializable by TFF.
     client_optimizer_fn: A callable accepting a float learning rate, and
-      returning a `tff.learning.optimizers.Optimizer` or a `tf.keras.Optimizer`.
+      returning a `tff.learning.optimizers.Optimizer` or a `tf_keras.Optimizer`.
     server_optimizer_fn: A `tff.learning.optimizers.Optimizer`, a no-arg
-      callable that returns a `tf.keras.Optimizer`, or None. By default, this
+      callable that returns a `tf_keras.Optimizer`, or None. By default, this
       uses `tff.learning.optimizers.build_sgdm` with a learning rate of 1.0.
     model_distributor: An optional `DistributionProcess` that distributes the
       model weights on the server to the clients. If set to `None`, the

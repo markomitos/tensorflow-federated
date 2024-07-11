@@ -16,6 +16,7 @@
 from typing import Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -136,7 +137,7 @@ def create_word_prediction_task_from_datasets(
         keras_model=word_prediction_models.create_recurrent_model(
             vocab_size=extended_vocab_size
         ),
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        loss=tf_keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         input_spec=task_datasets.element_type_structure,
         metrics=metrics_builder(),
     )

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.models import resnet_models
 
@@ -170,7 +171,7 @@ class ResNetConstructionTest(tf.test.TestCase):
         num_classes=10,
         norm_layer=resnet_models.NormLayer.BATCH_NORM,
     )
-    self.assertIsInstance(batch_resnet, tf.keras.Model)
+    self.assertIsInstance(batch_resnet, tf_keras.Model)
 
   def test_resnet_constructs_with_group_norm(self):
     group_resnet = resnet_models.create_resnet(
@@ -178,7 +179,7 @@ class ResNetConstructionTest(tf.test.TestCase):
         num_classes=10,
         norm_layer=resnet_models.NormLayer.GROUP_NORM,
     )
-    self.assertIsInstance(group_resnet, tf.keras.Model)
+    self.assertIsInstance(group_resnet, tf_keras.Model)
 
   def test_basic_block_has_fewer_parameters_than_bottleneck(self):
     input_shape = (32, 32, 3)
@@ -216,25 +217,25 @@ class CreateSpecializedResnetTest(tf.test.TestCase):
     resnet18 = resnet_models.create_resnet18(
         input_shape=(32, 32, 3), num_classes=100
     )
-    self.assertIsInstance(resnet18, tf.keras.Model)
+    self.assertIsInstance(resnet18, tf_keras.Model)
 
   def test_resnet34_constructs_with_cifar_inputs(self):
     resnet34 = resnet_models.create_resnet34(
         input_shape=(32, 32, 3), num_classes=100
     )
-    self.assertIsInstance(resnet34, tf.keras.Model)
+    self.assertIsInstance(resnet34, tf_keras.Model)
 
   def test_resnet50_constructs_with_cifar_inputs(self):
     resnet50 = resnet_models.create_resnet50(
         input_shape=(32, 32, 3), num_classes=100
     )
-    self.assertIsInstance(resnet50, tf.keras.Model)
+    self.assertIsInstance(resnet50, tf_keras.Model)
 
   def test_resnet152_constructs_with_cifar_inputs(self):
     resnet152 = resnet_models.create_resnet152(
         input_shape=(32, 32, 3), num_classes=100
     )
-    self.assertIsInstance(resnet152, tf.keras.Model)
+    self.assertIsInstance(resnet152, tf_keras.Model)
 
 
 if __name__ == '__main__':

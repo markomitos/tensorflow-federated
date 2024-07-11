@@ -18,15 +18,15 @@ from collections.abc import Callable
 from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
-
+import tf_keras
 
 def learning_process_builder(
     model_fn: Callable[[], tff.learning.models.VariableModel]
 ) -> tff.learning.templates.LearningProcess:
   return tff.learning.algorithms.build_weighted_fed_avg(
       model_fn=model_fn,
-      client_optimizer_fn=tf.keras.optimizers.SGD,
-      server_optimizer_fn=tf.keras.optimizers.SGD,
+      client_optimizer_fn=tf_keras.optimizers.SGD,
+      server_optimizer_fn=tf_keras.optimizers.SGD,
   )
 
 

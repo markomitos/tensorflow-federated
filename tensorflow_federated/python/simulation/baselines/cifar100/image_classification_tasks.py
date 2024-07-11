@@ -17,6 +17,7 @@ import enum
 from typing import Optional, Union
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -47,8 +48,8 @@ DEFAULT_CROP_WIDTH = 24
 
 def _get_resnet_model(
     model_id: Union[str, ResnetModel], input_shape: tuple[int, int, int]
-) -> tf.keras.Model:
-  """Constructs a `tf.keras.Model` for digit recognition."""
+) -> tf_keras.Model:
+  """Constructs a `tf_keras.Model` for digit recognition."""
   try:
     model_enum = ResnetModel(model_id)
   except ValueError as e:
@@ -146,9 +147,9 @@ def create_image_classification_task_with_datasets(
   def model_fn() -> variable.VariableModel:
     return keras_utils.from_keras_model(
         keras_model=_get_resnet_model(model_id, crop_shape),
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        loss=tf_keras.losses.SparseCategoricalCrossentropy(),
         input_spec=task_datasets.element_type_structure,
-        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+        metrics=[tf_keras.metrics.SparseCategoricalAccuracy()],
     )
 
   return baseline_task.BaselineTask(task_datasets, model_fn)

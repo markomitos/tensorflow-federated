@@ -16,6 +16,7 @@
 from typing import Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -95,8 +96,8 @@ def create_landmark_classification_task_from_datasets(
             num_classes=_NUM_CLASSES,
         ),
         input_spec=task_datasets.element_type_structure,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+        loss=tf_keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+        metrics=[tf_keras.metrics.SparseCategoricalAccuracy()],
     )
 
   return baseline_task.BaselineTask(task_datasets, model_fn)
