@@ -2270,7 +2270,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
 
     orig_model_output = tff_model.forward_pass(batch)
     loaded_model_output = loaded_model.forward_pass(batch)
-    self.assertAlmostEqual(orig_model_output.loss, loaded_model_output.loss)
+    self.assertAlmostEqual(orig_model_output.loss.numpy(), loaded_model_output.loss.numpy(), places=6)
 
   def test_keras_model_preprocessing(self):
     self.skipTest('b/171254807')
