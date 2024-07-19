@@ -13,6 +13,8 @@ def is_compiled(model: Model):
         return model.compiled
 
 def keras_dtype_to_tf(dtype_str):
+    if not isinstance(dtype_str, str):
+        return dtype_str
     return {
         'float32': tf.float32,
         'float64': tf.float64,

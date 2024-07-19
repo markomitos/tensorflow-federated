@@ -23,6 +23,7 @@ py_library(
     srcs = ["model_weights.py"],
     deps = [
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/common_libs:structure",
         "//tensorflow_federated/python/core/impl/types:computation_types",
@@ -48,6 +49,7 @@ py_library(
     srcs = ["functional.py"],
     deps = [
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/learning/metrics:keras_finalizer",
         "//tensorflow_federated/python/learning/metrics:keras_utils",

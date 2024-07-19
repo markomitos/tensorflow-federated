@@ -20,6 +20,7 @@ import numpy as np
 import tensorflow as tf
 import tf_keras
 import keras
+from tensorflow_federated.python.common_libs import keras_compat
 
 from tensorflow_federated.python.common_libs import py_typecheck
 from tensorflow_federated.python.common_libs import structure
@@ -127,11 +128,11 @@ def weights_type_from_model(
   model_weights = ModelWeights.from_model(model)
 
   def _variable_to_type(x: tf.Variable) -> computation_types.Type:
+    if isinstance(x.dtype, str):
+      return computation_types.tensorflow_to_type((keras_compat.keras_dtype_to_tf(x.dtype), x.shape))
     return computation_types.tensorflow_to_type((x.dtype, x.shape))
 
   model_weights_type = tf.nest.map_structure(_variable_to_type, model_weights)
-  # StructWithPythonType operates recursively, and will preserve the python type
-  # information of model.trainable_variables and model.non_trainable_variables.
   return computation_types.StructWithPythonType(
       model_weights_type, ModelWeights
   )
