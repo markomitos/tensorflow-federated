@@ -2,7 +2,7 @@ import keras
 import tf_keras
 import tensorflow as tf
 from typing import Union
-
+from keras.src.backend.common import KerasVariable
 
 Model = Union[tf_keras.Model, keras.Model]
 
@@ -21,3 +21,7 @@ def keras_dtype_to_tf(dtype_str):
         'int32': tf.int32,
         'int64': tf.int64
     }.get(dtype_str, tf.float32)
+
+#TODO Add additional checks
+def is_keras3(obj: object):
+    return isinstance(obj, (keras.Model, keras.Variable, keras.Metric, keras.Layer, keras.Loss, keras.Optimizer, KerasVariable))
