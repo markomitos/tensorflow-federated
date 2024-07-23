@@ -19,6 +19,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -41,11 +42,22 @@ def _test_functional_finalize_metrics(
   )
 
 
+def _test_functional_finalize_metrics_keras3(
+    unfinalized_metrics: collections.OrderedDict[str, Any]
+) -> collections.OrderedDict[str, Any]:
+  return collections.OrderedDict(
+      accuracy=keras_finalizer.create_keras_metric_finalizer(
+          keras.metrics.SparseCategoricalAccuracy
+      )(unfinalized_metrics['accuracy'])
+  )
+
+
 class CheckMetricFinalizersTest(tf.test.TestCase, parameterized.TestCase):
 
   @parameterized.named_parameters(
       ('ordereddict', collections.OrderedDict(mean=_tf_mean)),
       ('functional_finalizers', _test_functional_finalize_metrics),
+      ('functional_finalizers_keras3', _test_functional_finalize_metrics_keras3),
   )
   def test_valid_finalizers_does_not_raise(self, metric_finalizers):
     aggregation_utils.check_metric_finalizers(metric_finalizers)
@@ -182,6 +194,22 @@ class CheckBuildFinalizerComputationTest(
                   ],
               )],
               collections.OrderedDict,
+          ),
+          collections.OrderedDict(accuracy=[0.4, 2.0]),
+          collections.OrderedDict(accuracy=0.4 / 2.0),
+      ),
+      (
+          'functional_keras3',
+          _test_functional_finalize_metrics_keras3,
+          computation_types.StructWithPythonType(
+            [(
+                'accuracy',
+                [
+                  computation_types.TensorType(np.float32),
+                  computation_types.TensorType(np.float32),
+                ],
+            )],
+            collections.OrderedDict,
           ),
           collections.OrderedDict(accuracy=[0.4, 2.0]),
           collections.OrderedDict(accuracy=0.4 / 2.0),
