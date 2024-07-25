@@ -530,13 +530,14 @@ def build_conv_batch_norm_keras3_model():
       pool_size=(2, 2), strides=(2, 2), padding='same', data_format=data_format
   )
   keras_model = keras.models.Sequential([
-      l.Reshape(target_shape=[28, 28, 1], input_shape=(28 * 28,)),
+      l.Input(shape=(28 * 28,)),
+      l.Reshape(target_shape=[28, 28, 1]),
       l.Conv2D(
           filters=32,
           kernel_size=5,
           padding='same',
           data_format=data_format,
-          activation=tf.nn.relu,
+          activation='relu',
           kernel_initializer='zeros',
           bias_initializer='zeros',
       ),
@@ -547,7 +548,7 @@ def build_conv_batch_norm_keras3_model():
           kernel_size=5,
           padding='same',
           data_format=data_format,
-          activation=tf.nn.relu,
+          activation='relu',
           kernel_initializer='zeros',
           bias_initializer='zeros',
       ),
@@ -556,7 +557,7 @@ def build_conv_batch_norm_keras3_model():
       l.Flatten(),
       l.Dense(
           units=1024,
-          activation=tf.nn.relu,
+          activation='relu',
           kernel_initializer='zeros',
           bias_initializer='zeros',
       ),
