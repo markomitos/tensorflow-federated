@@ -15,6 +15,7 @@
 from absl.testing import parameterized
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -56,6 +57,62 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
     weights = init_w()
     self.assertGreater(fn(weights), 5.0)
     optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1, momentum=momentum)
+    @tensorflow_computation.tf_computation()
+    def initialize_fn():
+      variables = tf.Variable(tf.zeros([5, 1]))
+      optimizer = keras_optimizer.KerasOptimizer(
+          optimizer_fn, variables, disjoint_init_and_next=True
+      )
+      return optimizer.initialize(
+          tf.TensorSpec(variables.shape, variables.dtype)
+      )
+
+    @tf.function
+    def single_step(optimizer, state, variables):
+      gradients = grad_fn(variables)
+      new_state, updated_weights = optimizer.next(state, variables, gradients)
+      return new_state, updated_weights
+
+    @tensorflow_computation.tf_computation()
+    def next_fn(state, initial_weights):
+      variables = tf.Variable(initial_weights)
+      optimizer = keras_optimizer.KerasOptimizer(
+          optimizer_fn, variables, disjoint_init_and_next=True
+      )
+      return single_step(optimizer, state, variables)
+
+    state = initialize_fn()
+    for _ in range(100):
+      state, weights = next_fn(state, weights)
+
+    self.assertLess(fn(weights), 0.005)
+    # The optimizer variables are exposed by the KerasOptimizer. First variable
+    # of a keras optimzier is the number of steps taken.
+    self.assertEqual(100, state[0])
+
+  @parameterized.named_parameters(('no_momentum', 0.0), ('momentum_0_5', 0.5))
+  def test_disjoint_init_and_next_true_keras3(self, momentum):
+    """Tests behavior expected as 'TFF server optimizer'.
+
+    This test creates two `tff.Computation`s, which would correspond to parts of
+    the two arguments for creation of a `tff.templates.IterativeProcess`.
+
+    The `KerasOptimizers` is instantiated in both of these computations, and
+    only one of its `initialize` and `next` methods is invoked in each of them.
+    The state which optimizers need is exposed by the `KerasOptimizer` and needs
+    to be carried between the invocations of the created `tff.Computation`s.
+
+    Note that even though it is expected that `variables` passed to the
+    `single_step` method are expected to be `tf.Variable` instances, the code
+    can still be written in a functional manner.
+
+    Args:
+      momentum: Momentum parameter to be used in keras.optimizers.SGD.
+    """
+    init_w, fn, grad_fn = optimizer_test_utils.test_quadratic_problem()
+    weights = init_w()
+    self.assertGreater(fn(weights), 5.0)
+    optimizer_fn = lambda: keras.optimizers.SGD(0.1, momentum=momentum)
 
     @tensorflow_computation.tf_computation()
     def initialize_fn():
@@ -110,6 +167,50 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
     weights = init_w()
     self.assertGreater(fn(weights), 5.0)
     optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1, momentum=momentum)
+
+    @tf.function
+    def training_loop(optimizer, variables):
+      state = optimizer.initialize(
+          tf.TensorSpec(variables.shape, variables.dtype)
+      )
+      for _ in range(100):
+        gradients = grad_fn(variables)
+        state, variables = optimizer.next(state, variables, gradients)
+      return state, variables
+
+    @tensorflow_computation.tf_computation()
+    def local_training(initial_weights):
+      variables = tf.Variable(initial_weights)
+      optimizer = keras_optimizer.KerasOptimizer(
+          optimizer_fn, variables, disjoint_init_and_next=False
+      )
+      return training_loop(optimizer, variables)
+
+    state, optimized_weights = local_training(weights)
+    self.assertLess(fn(optimized_weights), 0.005)
+    # The optimizer variables are handled internally in the KerasOptimizer.
+    self.assertEmpty(state)
+
+  @parameterized.named_parameters(('no_momentum', 0.0), ('momentum_0_5', 0.5))
+  def test_disjoint_init_and_next_false_keras3(self, momentum):
+    """Tests behavior expected as 'TFF client optimizer'.
+
+    The main part of this test is `training_loop` method, which works with
+    already instantiated `KerasOptimizer` and uses both of its `initialize` and
+    `next` methods to perform a number of training steps. This is the behavior
+    expected to happen during local training at clients.
+
+    Note that even though it is expected that `variables` passed to the
+    `training_loop` method are expected to be `tf.Variable` instances, the code
+    can still be written in a functional manner.
+
+    Args:
+      momentum: Momentum parameter to be used in tf_keras.optimizers.SGD.
+    """
+    init_w, fn, grad_fn = optimizer_test_utils.test_quadratic_problem()
+    weights = init_w()
+    self.assertGreater(fn(weights), 5.0)
+    optimizer_fn = lambda: keras.optimizers.SGD(0.1, momentum=momentum)
 
     @tf.function
     def training_loop(optimizer, variables):
@@ -202,8 +303,56 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
       ('struct_client', _STRUCT_SPEC, False),
       ('nested_client', _NESTED_SPEC, False),
   )
+  def test_spec_keras3(self, specs, disjoint_init_and_next):
+    """Test compatibility with different structures of variables."""
+    optimizer_fn = lambda: keras.optimizers.SGD(0.1)
+    variables = tf.nest.map_structure(
+        lambda s: tf.Variable(tf.ones(s.shape, s.dtype)), specs
+    )
+    gradients = tf.nest.map_structure(
+        lambda s: tf.ones(s.shape, s.dtype), specs
+    )
+
+    optimizer = keras_optimizer.KerasOptimizer(
+        optimizer_fn, variables, disjoint_init_and_next=disjoint_init_and_next
+    )
+    state = optimizer.initialize(specs)
+    for _ in range(3):
+      state, variables = optimizer.next(state, variables, gradients)
+
+    expected_variables = tf.nest.map_structure(
+        lambda s: 0.7 * tf.ones(s.shape, s.dtype), specs
+    )
+    self.assertAllClose(expected_variables, variables)
+
+  @parameterized.named_parameters(
+      ('scalar_server', _SCALAR_SPEC, True),
+      ('struct_server', _STRUCT_SPEC, True),
+      ('nested_server', _NESTED_SPEC, True),
+      ('scalar_client', _SCALAR_SPEC, False),
+      ('struct_client', _STRUCT_SPEC, False),
+      ('nested_client', _NESTED_SPEC, False),
+  )
   def test_build_tff_optimizer_keras(self, specs, disjoint_init_and_next):
     optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1)
+    variables = tf.nest.map_structure(
+        lambda s: tf.Variable(tf.ones(s.shape, s.dtype)), specs
+    )
+    optimizer = keras_optimizer.build_or_verify_tff_optimizer(
+        optimizer_fn, variables, disjoint_init_and_next
+    )
+    self.assertIsInstance(optimizer, optimizer_base.Optimizer)
+
+  @parameterized.named_parameters(
+      ('scalar_server', _SCALAR_SPEC, True),
+      ('struct_server', _STRUCT_SPEC, True),
+      ('nested_server', _NESTED_SPEC, True),
+      ('scalar_client', _SCALAR_SPEC, False),
+      ('struct_client', _STRUCT_SPEC, False),
+      ('nested_client', _NESTED_SPEC, False),
+  )
+  def test_build_tff_optimizer_keras3(self, specs, disjoint_init_and_next):
+    optimizer_fn = lambda: keras.optimizers.SGD(0.1)
     variables = tf.nest.map_structure(
         lambda s: tf.Variable(tf.ones(s.shape, s.dtype)), specs
     )

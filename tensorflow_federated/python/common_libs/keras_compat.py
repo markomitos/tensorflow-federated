@@ -22,6 +22,13 @@ def keras_dtype_to_tf(dtype_str):
         'int64': tf.int64
     }.get(dtype_str, tf.float32)
 
+
 #TODO Add additional checks
 def is_keras3(obj: object):
     return isinstance(obj, (keras.Model, keras.Variable, keras.Metric, keras.Layer, keras.Loss, keras.Optimizer, KerasVariable))
+
+
+def get_optimizer_variables(optimizer: Union[tf_keras.optimizers.Optimizer, keras.optimizers.Optimizer]):
+    if callable(optimizer.variables):
+        return optimizer.variables()
+    return optimizer.variables
