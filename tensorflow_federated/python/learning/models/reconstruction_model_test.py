@@ -251,7 +251,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     ):
       self.assertIs(var, expected_var)
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_layers_with_global_and_local_layers(self):
     keras_model = _get_two_layer_keras3_model()
     local_layers = keras_model.layers[:1]
@@ -345,7 +344,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     )
     self.assertTrue(global_model_weights_type.is_equivalent_to(expected_type))
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_global_weights_type_with_global_and_local_keras3_layers(self):
     keras_model = _get_two_layer_keras3_model()
     local_layers = keras_model.layers[:1]

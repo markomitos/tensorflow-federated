@@ -19,12 +19,13 @@ These tests also serve as examples for users who are familiar with Keras.
 import collections
 import warnings
 
-import keras.src.backend
+import keras
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tf_keras
 
+from tensorflow_federated.python.common_libs import keras_compat
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
 from tensorflow_federated.python.core.impl.computation import computation_base
@@ -129,6 +130,17 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
   # Test class for batches using namedtuple.
   _make_test_batch = collections.namedtuple('TestBatch', ['x', 'y'])
 
+  def test_convert_fails_on_non_keras3_model(self):
+    with self.assertRaisesRegex(TypeError, r'keras\..*\.Model'):
+      keras_utils.from_keras_model(
+          keras_model=0,  # not a keras.Model
+          input_spec=_create_whimsy_types(1),
+          loss=keras.losses.MeanSquaredError(),
+      )
+
+  # Test class for batches using namedtuple.
+  _make_test_batch = collections.namedtuple('TestBatch', ['x', 'y'])
+
   @parameterized.named_parameters(
       (
           'container',
@@ -210,7 +222,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       tff_model = keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=input_spec,
-          loss=tf_keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
       )
       self.assertIsInstance(tff_model, variable.VariableModel)
       tf.nest.map_structure(
@@ -253,7 +265,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       tff_model = keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=input_type,
-          loss=tf_keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
       )
       self.assertIsInstance(tff_model, variable.VariableModel)
       self.assertIsInstance(tff_model.input_spec, collections.OrderedDict)
@@ -292,7 +304,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=input_spec,
-        loss=tf_keras.losses.BinaryCrossentropy(from_logits=True),
+        loss=keras.losses.BinaryCrossentropy(from_logits=True),
     )
     self.assertIsInstance(tff_model, variable.VariableModel)
     self.assertIsInstance(tff_model.input_spec['x'], tf.RaggedTensorSpec)
@@ -371,7 +383,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=input_spec,
-          loss=tf_keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
       )
 
   @parameterized.named_parameters(
@@ -451,7 +463,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=input_spec,
-          loss=tf_keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
       )
 
   @parameterized.named_parameters(
@@ -460,19 +472,19 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_tff_model_from_keras_model(self, feature_dims, model_fn):
     keras_model = model_fn(feature_dims=feature_dims)
-    if "tf_keras" in str(type(keras_model)):
+    if keras_compat.is_keras3(keras_model):
+      tff_model = keras_utils.from_keras_model(
+          keras_model=keras_model,
+          input_spec=_create_whimsy_types(feature_dims),
+          loss=keras.losses.MeanSquaredError(),
+          metrics=[keras.metrics.MeanAbsoluteError()],
+      )
+    else:
       tff_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=_create_whimsy_types(feature_dims),
         loss=tf_keras.losses.MeanSquaredError(),
         metrics=[tf_keras.metrics.MeanAbsoluteError()],
-      )
-    else:
-      tff_model = keras_utils.from_keras_model(
-          keras_model=keras_model,
-          input_spec=_create_whimsy_types(feature_dims),
-          loss=tf_keras.losses.MeanSquaredError(),
-          metrics=[keras.metrics.MeanAbsoluteError()],
       )
     self.assertIsInstance(tff_model, variable.VariableModel)
 
@@ -575,7 +587,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=_create_whimsy_types(3),
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[keras.metrics.MeanAbsoluteError()],
       )
     self.assertIsInstance(tff_model, variable.VariableModel)
@@ -624,19 +636,19 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
   @parameterized.named_parameters(*_create_tff_model_from_keras_model_tuples())
   def test_tff_model_from_keras_model_input_spec(self, feature_dims, model_fn):
     keras_model = model_fn(feature_dims=feature_dims)
-    if "tf_keras" in str(type(keras_model)):
+    if keras_compat.is_keras3(keras_model):
       tff_model = keras_utils.from_keras_model(
           keras_model=keras_model,
-          input_spec=_create_whimsy_types(3),
-          loss=tf_keras.losses.MeanSquaredError(),
-          metrics=[tf_keras.metrics.MeanAbsoluteError()],
+          input_spec=_create_whimsy_types(feature_dims),
+          loss=keras.losses.MeanSquaredError(),
+          metrics=[keras.metrics.MeanAbsoluteError()],
       )
     else:
       tff_model = keras_utils.from_keras_model(
           keras_model=keras_model,
-          input_spec=_create_whimsy_types(3),
+          input_spec=_create_whimsy_types(feature_dims),
           loss=tf_keras.losses.MeanSquaredError(),
-          metrics=[keras.metrics.MeanAbsoluteError()],
+          metrics=[tf_keras.metrics.MeanAbsoluteError()],
       )
     self.assertIsInstance(tff_model, variable.VariableModel)
 
@@ -689,7 +701,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
         return tf.nn.sparse_softmax_cross_entropy_with_logits(y_true, y_pred)
 
     keras_model = tf_keras.Sequential(
-        layers=[tf_keras.Input(shape=(2,)), tf_keras.layers.Dense(units=10)]
+        [tf_keras.Input(shape=(2,)), tf_keras.layers.Dense(units=10)]
     )
 
     input_spec = [
@@ -712,7 +724,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model.forward_pass(batch)
 
   def test_tff_model_from_keras3_model_with_custom_loss_with_integer_label(self):
-    class _CustomLossRequiringLabelBeInteger(tf_keras.losses.Loss):
+    class _CustomLossRequiringLabelBeInteger(keras.losses.Loss):
 
       def __init__(self):
         super().__init__(name='custom_loss_requiring_label_be_integer')
@@ -720,10 +732,10 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       def call(self, y_true, y_pred):
         # Note that this TF function requires that the label `y_true` be of an
         # integer dtype; a TypeError is thrown if `y_true` isn't int32 or int64.
-        return tf.nn.sparse_softmax_cross_entropy_with_logits(y_true, y_pred)
+        return keras.ops.nn.sparse_categorical_crossentropy(y_true, y_pred, from_logits=True)
 
     keras_model = keras.Sequential(
-        layers=[keras.Input(shape=(2,)), keras.layers.Dense(units=10)]
+        [keras.Input(shape=(2,)), keras.layers.Dense(units=10)]
     )
 
     input_spec = [
@@ -787,7 +799,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     ]
     tff_model = keras_utils.from_keras_model(
         keras_model=keras_model,
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         input_spec=input_spec,
     )
     self.assertIsInstance(tff_model, variable.VariableModel)
@@ -855,7 +867,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=model,
         input_spec=input_spec,
-        loss=tf_keras.losses.SparseCategoricalCrossentropy(),
+        loss=keras.losses.SparseCategoricalCrossentropy(),
         metrics=[keras.metrics.MeanAbsoluteError()],
     )
 
@@ -952,7 +964,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=model,
         input_spec=input_spec,
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[keras.metrics.MeanAbsoluteError()],
     )
 
@@ -984,7 +996,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     loaded_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=input_spec,
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[keras.metrics.MeanAbsoluteError()],
     )
 
@@ -1068,7 +1080,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAlmostEqual(orig_model_output.loss, loaded_model_output.loss)
 
   def test_keras3_model_tupled_dict_outputs(self):
-    class CustomLoss(tf_keras.losses.Loss):
+    class CustomLoss(keras.losses.Loss):
 
       def __init__(self):
         super().__init__(name='custom_loss')
@@ -1078,7 +1090,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
         pred_input, pred_output = y_pred
         total_loss = tf.zeros(())
         for key in pred_input.keys():
-          total_loss += tf_keras.losses.MeanSquaredError()(
+          total_loss += keras.losses.MeanSquaredError()(
               pred_input[key], pred_output[key]
           )
         return total_loss
@@ -1216,7 +1228,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       tff_model = keras_utils.from_keras_model(
           keras_model=model,
           input_spec=input_spec,
-          loss=tf_keras.losses.SparseCategoricalCrossentropy(),
+          loss=keras.losses.SparseCategoricalCrossentropy(),
           metrics=[keras.metrics.MeanAbsoluteError()],
       )
       # Ensure we can get warning of Batch Normalization.
@@ -1499,7 +1511,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
             feature_dims=feature_dims
         ),
         input_spec=_create_whimsy_types(feature_dims=feature_dims),
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[
             counters.Keras3NumBatchesCounter(),
             counters.Keras3NumExamplesCounter(),
@@ -1771,8 +1783,8 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
                   keras_model=keras_model,
                   input_spec=input_spec,
                   loss=[
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
                   ],
               )
 
@@ -1788,9 +1800,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
                   keras_model=keras_model,
                   input_spec=input_spec,
                   loss={
-                      'dense_5': tf_keras.losses.MeanSquaredError(),
-                      'dense_6': tf_keras.losses.MeanSquaredError(),
-                      'whimsy': tf_keras.losses.MeanSquaredError(),
+                      'dense_5': keras.losses.MeanSquaredError(),
+                      'dense_6': keras.losses.MeanSquaredError(),
+                      'whimsy': keras.losses.MeanSquaredError(),
                   },
               )
 
@@ -1799,9 +1811,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
               keras_model=keras_model,
               input_spec=input_spec,
               loss=[
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
               ],
           )
 
@@ -1820,7 +1832,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
           output = tff_model.forward_pass(example_batch)
           self.assertAllClose(output.loss, 2.0)
 
-      class CustomLoss(tf_keras.losses.Loss):
+      class CustomLoss(keras.losses.Loss):
 
           def __init__(self):
               super().__init__(name='custom_loss')
@@ -1828,7 +1840,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
           def call(self, y_true, y_pred):
               loss = tf.constant(0.0)
               for label, prediction in zip(y_true, y_pred):
-                  loss += tf_keras.losses.MeanSquaredError()(label, prediction)
+                  loss += keras.losses.MeanSquaredError()(label, prediction)
               return loss
 
       keras_model = model_examples.build_multiple_outputs_keras3_model()
@@ -1846,9 +1858,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
               keras_model=keras_model,
               input_spec=input_spec,
               loss=[
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
               ],
               loss_weights=[0.1, 0.2, 0.3],
           )
@@ -1865,9 +1877,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
                   keras_model=keras_model,
                   input_spec=input_spec,
                   loss=[
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
                   ],
                   loss_weights=[0.1, 0.2],
               )
@@ -1878,9 +1890,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
                   keras_model=keras_model,
                   input_spec=input_spec,
                   loss=[
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
                   ],
                   loss_weights={'dense_5': 0.1, 'dense_6': 0.2, 'whimsy': 0.4},
               )
@@ -2099,8 +2111,8 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
                   keras_model=keras_model,
                   input_spec=input_spec,
                   loss=[
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
                   ],
               )
 
@@ -2115,9 +2127,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
               keras_model=keras_model,
               input_spec=input_spec,
               loss=[
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
               ],
           )
 
@@ -2154,9 +2166,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
               keras_model=keras_model,
               input_spec=input_spec,
               loss=[
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
-                  tf_keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
+                  keras.losses.MeanSquaredError(),
               ],
               loss_weights=[0.1, 0.2, 0.3],
           )
@@ -2177,9 +2189,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
                   keras_model=keras_model,
                   input_spec=input_spec,
                   loss=[
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
                   ],
                   loss_weights=[0.1, 0.2],
               )
@@ -2190,9 +2202,9 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
                   keras_model=keras_model,
                   input_spec=input_spec,
                   loss=[
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
-                      tf_keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
+                      keras.losses.MeanSquaredError(),
                   ],
                   loss_weights={'dense_5': 0.1, 'dense_6': 0.2, 'whimsy': 0.4},
               )
@@ -2252,7 +2264,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=model,
         input_spec=input_spec,
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[keras.metrics.MeanAbsoluteError()],
     )
 
@@ -2281,7 +2293,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     loaded_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=input_spec,
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[keras.metrics.MeanAbsoluteError()],
     )
 
@@ -2346,7 +2358,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=model,
         input_spec=input_spec,
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[keras.metrics.MeanAbsoluteError()],
     )
 
@@ -2375,7 +2387,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     loaded_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=input_spec,
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[keras.metrics.MeanAbsoluteError()],
     )
 
@@ -2405,13 +2417,13 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
         feature_dims
     )
 
-    keras_model.compile(loss=tf_keras.losses.MeanSquaredError())
+    keras_model.compile(loss=keras.losses.MeanSquaredError())
 
     with self.assertRaisesRegex(ValueError, 'compile'):
       keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=_create_whimsy_types(feature_dims),
-          loss=tf_keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
           metrics=[keras.metrics.MeanAbsoluteError()],
       )
 
@@ -2476,7 +2488,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=_create_whimsy_types(feature_dims),
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[CustomCounter(arg1=1)],
     )
     metrics_aggregator = aggregator.sum_then_finalize
@@ -2573,7 +2585,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=_create_whimsy_types(feature_dims),
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[CustomCounter(arg1=1)],
     )
     metrics_aggregator = aggregator.sum_then_finalize
@@ -2625,16 +2637,16 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
         return super().update_state(self._arg1, sample_weight)
 
     keras_model = model_fn(feature_dims=feature_dims)
-    if "tf_keras" in str(type(keras_model)):
+    if keras_compat.is_keras3(keras_model):
       tff_model = keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=_create_whimsy_types(feature_dims),
-          loss=tf_keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
           # Verify passing constructor of custom Keras metric with extra args in
           # `__init__` works.
           metrics=[
-              tf_keras.metrics.MeanAbsoluteError,
-              lambda: CustomCounter(arg1=1),
+              keras.metrics.MeanAbsoluteError,
+              lambda: Keras3CustomCounter(arg1=1),
           ],
       )
     else:
@@ -2645,8 +2657,8 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
           # Verify passing constructor of custom Keras metric with extra args in
           # `__init__` works.
           metrics=[
-              keras.metrics.MeanAbsoluteError,
-              lambda: Keras3CustomCounter(arg1=1),
+              tf_keras.metrics.MeanAbsoluteError,
+              lambda: CustomCounter(arg1=1),
           ],
       )
     self.assertIsInstance(tff_model, variable.VariableModel)
@@ -2697,11 +2709,20 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_keras_model_without_input_metrics(self, feature_dims, model_fn):
     keras_model = model_fn(feature_dims=feature_dims)
-    tff_model = keras_utils.from_keras_model(
-        keras_model=keras_model,
-        input_spec=_create_whimsy_types(feature_dims),
-        loss=tf_keras.losses.MeanSquaredError(),
-    )
+    if keras_compat.is_keras3(keras_model):
+      print("keras3="+str(type(keras_model)))
+      tff_model = keras_utils.from_keras_model(
+          keras_model=keras_model,
+          input_spec=_create_whimsy_types(feature_dims),
+          loss=keras.losses.MeanSquaredError(),
+      )
+    else:
+      print("tf2=" + str(type(keras_model)))
+      tff_model = keras_utils.from_keras_model(
+          keras_model=keras_model,
+          input_spec=_create_whimsy_types(feature_dims),
+          loss=tf_keras.losses.MeanSquaredError(),
+      )
     self.assertIsInstance(tff_model, variable.VariableModel)
 
     # Metrics should be zero, though the model wrapper internally executes the
@@ -2775,7 +2796,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       ('non_callable', [tf.constant(1.0)], 'found a non-callable'),
       (
           'non_keras_metric_constructor',
-          [tf_keras.losses.MeanSquaredError],
+          [keras.losses.MeanSquaredError],
           'not a no-arg callable',
       ),
   )
@@ -2791,7 +2812,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=_create_whimsy_types(feature_dims),
-          loss=tf_keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
           metrics=metrics,
       )
 
@@ -2833,7 +2854,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     model = keras_utils.from_keras_model(
         keras_model=keras_model,
         input_spec=_create_whimsy_types(feature_dims),
-        loss=tf_keras.losses.MeanSquaredError(),
+        loss=keras.losses.MeanSquaredError(),
         metrics=[metric],
     )
 
@@ -2849,19 +2870,19 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
       self, feature_dims, model_fn
   ):
     keras_model = model_fn(feature_dims=feature_dims)
-    if "tf_keras" in str(type(keras_model)):
+    if keras_compat.is_keras3(keras_model):
       tff_model = keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=_create_whimsy_types(feature_dims),
-          loss=tf_keras.losses.MeanSquaredError(),
-          metrics=[tf_keras.metrics.MeanAbsoluteError()],
+          loss=keras.losses.MeanSquaredError(),
+          metrics=[keras.metrics.MeanAbsoluteError()],
       )
     else:
       tff_model = keras_utils.from_keras_model(
           keras_model=keras_model,
           input_spec=_create_whimsy_types(feature_dims),
           loss=tf_keras.losses.MeanSquaredError(),
-          metrics=[keras.metrics.MeanAbsoluteError()],
+          metrics=[tf_keras.metrics.MeanAbsoluteError()],
       )
     self.assertIsInstance(tff_model, variable.VariableModel)
 

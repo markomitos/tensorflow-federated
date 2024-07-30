@@ -100,6 +100,7 @@ py_test(
         ":model_examples",
         ":model_weights",
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/core/backends/native:execution_contexts",
         "//tensorflow_federated/python/core/environments/tensorflow_frontend:tensorflow_computation",
         "//tensorflow_federated/python/core/impl/computation:computation_base",

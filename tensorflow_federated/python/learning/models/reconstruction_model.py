@@ -542,36 +542,20 @@ class _KerasReconstructionModel(ReconstructionModel):
 
     # Ensure global/local trainable/non-trainable variables are disjoint from
     # each other.
-    if isinstance(inner_model, tf_keras.Model):
-        var_refs_sets = {
-            'global_trainable_variables': set(
-                [var.ref() for var in self._global_trainable_variables]
-            ),
-            'global_non_trainable_variables': set(
-                [var.ref() for var in self._global_non_trainable_variables]
-            ),
-            'local_trainable_variables': set(
-                [var.ref() for var in self._local_trainable_variables]
-            ),
-            'local_non_trainable_variables': set(
-                [var.ref() for var in self._local_non_trainable_variables]
-            ),
-        }
-    else:
-        var_refs_sets = {
-            'global_trainable_variables': set(
-                [id(var) for var in self._global_trainable_variables]
-            ),
-            'global_non_trainable_variables': set(
-                [id(var) for var in self._global_non_trainable_variables]
-            ),
-            'local_trainable_variables': set(
-                [id(var) for var in self._local_trainable_variables]
-            ),
-            'local_non_trainable_variables': set(
-                [id(var) for var in self._local_non_trainable_variables]
-            ),
-        }
+    var_refs_sets = {
+        'global_trainable_variables': set(
+            [keras_compat.ref(var) for var in self._global_trainable_variables]
+        ),
+        'global_non_trainable_variables': set(
+            [keras_compat.ref(var) for var in self._global_non_trainable_variables]
+        ),
+        'local_trainable_variables': set(
+            [keras_compat.ref(var) for var in self._local_trainable_variables]
+        ),
+        'local_non_trainable_variables': set(
+            [keras_compat.ref(var) for var in self._local_non_trainable_variables]
+        ),
+    }
     for first_key in list(var_refs_sets):
       first_var_ref_set = var_refs_sets.pop(first_key)
       for second_key, second_var_ref_set in var_refs_sets.items():
@@ -697,9 +681,8 @@ def global_weights_type_from_model(
   global_model_weights = ReconstructionModel.get_global_variables(model)
 
   def _variable_to_type(x: tf.Variable) -> computation_types.Type:
-    if isinstance(x.dtype, str):
-        return computation_types.tensorflow_to_type((keras_compat.keras_dtype_to_tf(x.dtype), x.shape))
-    return computation_types.tensorflow_to_type((x.dtype, x.shape))
+    return computation_types.tensorflow_to_type((keras_compat.keras_dtype_to_tf(x.dtype), x.shape))
+
 
   model_weights_type = tf.nest.map_structure(
       _variable_to_type, global_model_weights

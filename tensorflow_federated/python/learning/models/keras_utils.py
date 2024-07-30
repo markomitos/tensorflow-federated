@@ -143,7 +143,7 @@ def from_keras_model(
           )
       )
     for loss_fn in loss:
-      py_typecheck.check_type(loss_fn, tf_keras.losses.Loss)
+      py_typecheck.check_type(loss_fn, (tf_keras.losses.Loss, keras.losses.Loss))
 
     if loss_weights is None:
       loss_weights = [1.0] * len(loss)
@@ -214,7 +214,7 @@ def from_keras_model(
       break
 
   return _KerasModel(
-      keras_model=keras_model,
+      keras_model,
       input_spec=input_spec,
       loss_fns=loss,
       loss_weights=loss_weights,
@@ -321,7 +321,7 @@ class _KerasModel(variable.VariableModel):
       self,
       keras_model: Model,
       input_spec,
-      loss_fns: list[tf_keras.losses.Loss],
+      loss_fns: Union[list[tf_keras.losses.Loss], list[keras.losses.Loss]],
       loss_weights: list[float],
       metrics: Union[
           list[tf_keras.metrics.Metric],
@@ -424,15 +424,7 @@ class _KerasModel(variable.VariableModel):
         return super().update_state(batch_loss, batch_size)
 
     extra_metrics_constructors = []
-    if "tf_keras" in str(type(keras_model)):
-      extra_metrics_constructors.append(_WeightedMeanLossMetric)
-      if 'num_examples' not in metric_names:
-        logging.info('Adding default num_examples metric to model')
-        extra_metrics_constructors.append(counters.NumExamplesCounter)
-      if 'num_batches' not in metric_names:
-        logging.info('Adding default num_batches metric to model')
-        extra_metrics_constructors.append(counters.NumBatchesCounter)
-    else:
+    if keras_compat.is_keras3(keras_model):
       extra_metrics_constructors.append(_Keras3WeightedMeanLossMetric)
       if 'num_examples' not in metric_names:
         logging.info('Adding default num_examples metric to model')
@@ -440,6 +432,14 @@ class _KerasModel(variable.VariableModel):
       if 'num_batches' not in metric_names:
         logging.info('Adding default num_batches metric to model')
         extra_metrics_constructors.append(counters.Keras3NumBatchesCounter)
+    else:
+      extra_metrics_constructors.append(_WeightedMeanLossMetric)
+      if 'num_examples' not in metric_names:
+        logging.info('Adding default num_examples metric to model')
+        extra_metrics_constructors.append(counters.NumExamplesCounter)
+      if 'num_batches' not in metric_names:
+        logging.info('Adding default num_batches metric to model')
+        extra_metrics_constructors.append(counters.NumBatchesCounter)
 
     self._metrics.extend(m() for m in extra_metrics_constructors)
     if not metrics or self._metric_constructors:

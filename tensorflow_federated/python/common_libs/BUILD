@@ -72,6 +72,12 @@ py_library(
     srcs = ["keras_compat.py"],
 )
 
+py_test(
+    name = "keras_compat_test",
+    srcs = ["keras_compat_test.py"],
+    deps = [":keras_compat"],
+)
+
 py_library(
     name = "py_typecheck",
     srcs = ["py_typecheck.py"],
