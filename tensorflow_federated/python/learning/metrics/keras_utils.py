@@ -27,18 +27,18 @@ from tensorflow_federated.python.common_libs import keras_compat
 
 StateVar = TypeVar('StateVar')
 MetricConstructor = Callable[[], tf_keras.metrics.Metric]
-KerasMetricConstructor = Callable[[], keras.metrics.Metric]
+Keras3MetricConstructor = Callable[[], keras.metrics.Metric]
 MetricConstructors = collections.OrderedDict[str, MetricConstructor]
-KerasMetricConstructors = collections.OrderedDict[str, KerasMetricConstructor]
+Keras3MetricConstructors = collections.OrderedDict[str, Keras3MetricConstructor]
 MetricStructure = collections.OrderedDict[str, tf_keras.metrics.Metric]
-KerasMetricStructure = collections.OrderedDict[str, keras.metrics.Metric]
-MetricsConstructor = Union[Callable[[], MetricStructure], Callable[[], KerasMetricStructure]]
+Keras3MetricStructure = collections.OrderedDict[str, keras.metrics.Metric]
+MetricsConstructor = Union[Callable[[], MetricStructure], Callable[[], Keras3MetricStructure]]
 Metrics = Union[tf_keras.metrics.Metric, keras.metrics.Metric]
 
 
 def create_functional_metric_fns(
     metrics_constructor: Union[
-        Union[MetricConstructor, KerasMetricConstructor], MetricsConstructor, Union[MetricConstructors, KerasMetricConstructors]
+        Union[MetricConstructor, Keras3MetricConstructor], MetricsConstructor, Union[MetricConstructors, Keras3MetricConstructors]
     ]
 ) -> tuple[
     Callable[[], StateVar],

@@ -72,7 +72,7 @@ class NumExamplesCounterTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(m.total, 0)
 
 
-class KerasNumExamplesCounterTest(parameterized.TestCase, tf.test.TestCase):
+class Keras3NumExamplesCounterTest(parameterized.TestCase, tf.test.TestCase):
 
   def test_construct(self):
     m = counters.Keras3NumExamplesCounter()
@@ -153,7 +153,7 @@ class NumBatchesCounterTest(parameterized.TestCase, tf.test.TestCase):
     m.reset_state()
     self.assertEqual(m.total, 0)
 
-class KerasNumBatchesCounterTest(parameterized.TestCase, tf.test.TestCase):
+class Keras3NumBatchesCounterTest(parameterized.TestCase, tf.test.TestCase):
 
   def test_construct(self):
     m = counters.Keras3NumBatchesCounter()

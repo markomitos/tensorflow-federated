@@ -30,6 +30,7 @@ from tensorflow_federated.python.common_libs import py_typecheck
 KerasMetricFinalizer = Callable[[list[tf.Tensor]], Any]
 Metric = Union[tf_keras.metrics.Metric, keras.metrics.Metric]
 
+
 # TODO: b/197746608 - removes the code path that takes in a constructed Keras
 # metric, because reconstructing metric via `from_config` can cause problems.
 def create_keras_metric_finalizer(
@@ -152,15 +153,12 @@ def create_keras_metric(
     no-arg callable that creates a `tf_keras.metrics.Metric` or a `keras.metrics.Metric`.
   """
   keras_metric = None
-  if isinstance(metric, tf_keras.metrics.Metric):
-    _check_keras_metric_config_constructable(metric)
-    keras_metric = type(metric).from_config(metric.get_config())
-  elif isinstance(metric, keras.metrics.Metric):
+  if isinstance(metric, (tf_keras.metrics.Metric, keras.metrics.Metric)):
     _check_keras_metric_config_constructable(metric)
     keras_metric = type(metric).from_config(metric.get_config())
   elif callable(metric):
     keras_metric = metric()
-    if not isinstance(keras_metric, Metric):
+    if not isinstance(keras_metric, (tf_keras.metrics.Metric, keras.metrics.Metric)):
       raise TypeError(
           'Expected input `metric` to be either a `tf_keras.metrics.Metric`, `keras.metrics.Metric` '
           'or a no-arg callable that creates a `tf_keras.metrics.Metric` or `keras.metrics.Metric`, '

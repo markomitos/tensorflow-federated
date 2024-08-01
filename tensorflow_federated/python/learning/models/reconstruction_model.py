@@ -572,35 +572,19 @@ class _KerasReconstructionModel(ReconstructionModel):
     # compare variables, and track variable names for informative error
     # messages.
     global_and_local_variables = set()
-    if isinstance(inner_model, tf_keras.Model):
-        for var in (
-            self._global_trainable_variables
-            + self._global_non_trainable_variables
-            + self._local_trainable_variables
-            + self._local_non_trainable_variables
-        ):
-          global_and_local_variables.add((var.ref(), var.name))
+    for var in (
+        self._global_trainable_variables
+        + self._global_non_trainable_variables
+        + self._local_trainable_variables
+        + self._local_non_trainable_variables
+    ):
+      global_and_local_variables.add((keras_compat.ref(var), var.name))
 
-
-        keras_variables = set(
-            (var.ref(), var.name)
-            for var in inner_model.trainable_variables
-            + inner_model.non_trainable_variables
-        )
-    else:
-        for var in (
-                self._global_trainable_variables
-                + self._global_non_trainable_variables
-                + self._local_trainable_variables
-                + self._local_non_trainable_variables
-        ):
-            global_and_local_variables.add((id(var), var.name))
-
-        keras_variables = set(
-            (id(var), var.name)
-            for var in inner_model.trainable_variables
-            + inner_model.non_trainable_variables
-        )
+    keras_variables = set(
+      (keras_compat.ref(var), var.name)
+      for var in inner_model.trainable_variables
+      + inner_model.non_trainable_variables
+    )
 
     if global_and_local_variables != keras_variables:
       # Use a symmetric set difference to compare the variables, since either
@@ -682,7 +666,6 @@ def global_weights_type_from_model(
 
   def _variable_to_type(x: tf.Variable) -> computation_types.Type:
     return computation_types.tensorflow_to_type((keras_compat.keras_dtype_to_tf(x.dtype), x.shape))
-
 
   model_weights_type = tf.nest.map_structure(
       _variable_to_type, global_model_weights

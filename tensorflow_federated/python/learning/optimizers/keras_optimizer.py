@@ -16,11 +16,11 @@
 from collections.abc import Callable
 from typing import Any, Optional, Union
 
+import keras
 import tensorflow as tf
 import tf_keras
-import keras
-from tensorflow_federated.python.common_libs import keras_compat
 
+from tensorflow_federated.python.common_libs import keras_compat
 from tensorflow_federated.python.learning.optimizers import optimizer
 
 

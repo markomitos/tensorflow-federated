@@ -57,6 +57,7 @@ class KerasOptimizerTest(tf.test.TestCase, parameterized.TestCase):
     weights = init_w()
     self.assertGreater(fn(weights), 5.0)
     optimizer_fn = lambda: tf_keras.optimizers.SGD(0.1, momentum=momentum)
+
     @tensorflow_computation.tf_computation()
     def initialize_fn():
       variables = tf.Variable(tf.zeros([5, 1]))

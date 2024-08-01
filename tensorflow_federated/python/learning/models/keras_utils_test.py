@@ -758,7 +758,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     tff_model.forward_pass(batch)
 
   def test_tff_model_type_spec_from_keras_model_unspecified_sequence_len(self):
-    keras_model = tf_keras.Sequential(layers=[
+    keras_model = tf_keras.Sequential([
         tf_keras.layers.InputLayer(input_shape=(None,)),
         tf_keras.layers.Embedding(input_dim=10, output_dim=10),
         tf_keras.layers.LSTM(units=1),
@@ -788,7 +788,7 @@ class KerasUtilsTest(tf.test.TestCase, parameterized.TestCase):
     self.assertAllEqual(output.predictions.shape, [2, 1])
 
   def test_tff_model_type_spec_from_keras3_model_unspecified_sequence_len(self):
-    keras_model = keras.Sequential(layers=[
+    keras_model = keras.Sequential([
         keras.layers.InputLayer(input_shape=(None,)),
         keras.layers.Embedding(input_dim=10, output_dim=10),
         keras.layers.LSTM(units=1),
