@@ -18,6 +18,7 @@ import copy
 from absl.testing import parameterized
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.learning.optimizers import optimizer as optimizer_base
 from tensorflow_federated.python.learning.optimizers import optimizer_test_utils
@@ -141,6 +142,30 @@ class RmsPropTest(optimizer_test_utils.TestCase, parameterized.TestCase):
     self.assert_optimizers_numerically_close(
         model_variables_fn, gradients, tff_optimizer_fn, keras_optimizer_fn
     )
+
+  def test_match_keras3(self):
+    weight_spec = [
+        tf.TensorSpec([10, 2], tf.float32),
+        tf.TensorSpec([2], tf.float32),
+    ]
+    steps = 10
+    genarator = tf.random.Generator.from_seed(2021)
+
+    def random_vector():
+      return [
+          genarator.normal(shape=s.shape, dtype=s.dtype) for s in weight_spec
+      ]
+
+    intial_weight = random_vector()
+    model_variables_fn = lambda: [tf.Variable(v) for v in intial_weight]
+    gradients = [random_vector() for _ in range(steps)]
+    tff_optimizer_fn = lambda: rmsprop.build_rmsprop(0.01, decay=0.9)
+    keras_optimizer_fn = lambda: keras.optimizers.RMSprop(0.01, rho=0.9)
+
+    self.assert_optimizers_numerically_close(
+        model_variables_fn, gradients, tff_optimizer_fn, keras_optimizer_fn
+    )
+
 
   @parameterized.named_parameters(
       ('negative_lr', -1.0, 0.9, 1e-7, 'learning_rate'),

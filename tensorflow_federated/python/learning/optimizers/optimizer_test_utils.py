@@ -17,6 +17,8 @@ from collections.abc import Callable, Collection
 
 import tensorflow as tf
 import tf_keras
+import keras
+from typing import Union
 
 from tensorflow_federated.python.learning.optimizers import optimizer as optimizer_base
 
@@ -85,7 +87,7 @@ class TestCase(tf.test.TestCase):
       model_variables_fn: Callable[[], Collection[tf.Variable]],
       gradients: Collection[Collection[tf.Tensor]],
       tff_optimizer_fn: Callable[[], optimizer_base.Optimizer],
-      keras_optimizer_fn: Callable[[], tf_keras.optimizers.Optimizer],
+      keras_optimizer_fn: Union[Callable[[], tf_keras.optimizers.Optimizer], Callable[[], keras.optimizers.Optimizer]],
   ):
     """Test the numerical correctness of TFF optimizer by comparign to Keras.
 
@@ -100,7 +102,7 @@ class TestCase(tf.test.TestCase):
       tff_optimizer_fn: A no-arg function returns a
         `tff.learning.optimizer.Optimizer`.
       keras_optimizer_fn:  A no-arg function returns a
-        `tf_keras.optimizers.Optimizer`.
+        `tf_keras.optimizers.Optimizer` or a `keras.optimizers.Optimizer`.
     """
 
     def _run_tff():

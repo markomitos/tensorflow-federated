@@ -16,9 +16,11 @@
 from collections.abc import Callable
 from typing import Any, Optional, Union
 
+import keras
 import tensorflow as tf
 import tf_keras
 
+from tensorflow_federated.python.common_libs import keras_compat
 from tensorflow_federated.python.learning.optimizers import optimizer
 
 
@@ -50,7 +52,7 @@ class KerasOptimizer(optimizer.Optimizer):
 
   def __init__(
       self,
-      optimizer_fn: Callable[[], tf_keras.optimizers.Optimizer],
+      optimizer_fn: Union[Callable[[], tf_keras.optimizers.Optimizer], Callable[[], keras.optimizers.Optimizer]],
       weights: Any,
       disjoint_init_and_next: bool,
   ):
@@ -58,7 +60,7 @@ class KerasOptimizer(optimizer.Optimizer):
 
     Args:
       optimizer_fn: A no-arg callable that creates and returns a
-        `tf_keras.optimizers.Optimizer`.
+        `tf_keras.optimizers.Optimizer` or a `keras.optimizers.Optimizer`.
       weights: A (possibly nested) structure of `tf.Variable` objects which are
         supposed to be modified during call to the `next` method of the
         optimizer.
@@ -84,14 +86,14 @@ class KerasOptimizer(optimizer.Optimizer):
   def initialize(self, specs):
     del specs  # Unused.
     if self._disjoint_init_and_next:
-      return self._optimizer.variables()
+      return keras_compat.get_optimizer_variables(self._optimizer)
     else:
       return ()
 
   def next(self, state, weights, gradients):
     if self._disjoint_init_and_next:
       tf.nest.map_structure(
-          lambda v, s: v.assign(s), self._optimizer.variables(), state
+          lambda v, s: v.assign(s), keras_compat.get_optimizer_variables(self._optimizer), state
       )
 
     self._optimizer.apply_gradients(
@@ -99,14 +101,14 @@ class KerasOptimizer(optimizer.Optimizer):
     )
 
     if self._disjoint_init_and_next:
-      return self._optimizer.variables(), weights
+      return keras_compat.get_optimizer_variables(self._optimizer), weights
     else:
       return (), weights
 
 
 def build_or_verify_tff_optimizer(
     optimizer_fn: Union[
-        Callable[[], tf_keras.optimizers.Optimizer], optimizer.Optimizer
+        Callable[[], tf_keras.optimizers.Optimizer], Callable[[], keras.optimizers.Optimizer], optimizer.Optimizer
     ],
     trainable_weights: Optional[Any] = None,
     disjoint_init_and_next: Optional[bool] = None,
@@ -115,13 +117,15 @@ def build_or_verify_tff_optimizer(
 
   This helper function is used for `tff.learning` to provide backward
   compatibility of accepting an argument of a no-arg callable returns a
-  `tf_keras.optimizers.Optimizer`. Keras optimizer has to be eagerly created in
+  `tf_keras.optimizers.Optimizer` or a `keras.optimizers.Optimizer`.
+  Keras optimizer has to be eagerly created in
   each TFF computation function. If the input `optimizer_fn` is already
   a `tff.learning.optimizers.Optimizer`, it will be directly returned.
 
   Args:
     optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-argument
-      callable that constructs and returns a `tf_keras.optimizers.Optimizer`.
+      callable that constructs and returns a `tf_keras.optimizers.Optimizer`
+      or a `keras.optimizers.Optimizer`.
     trainable_weights: Optional if `optimizer_fn` is a
       `tff.learning.optimizers.Optimizer`. A (possibly nested) structure of
       `tf.Variable` objects used to eagerly initialize Keras optimizers if

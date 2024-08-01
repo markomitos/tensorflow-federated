@@ -18,6 +18,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.test import execution_contexts
 from tensorflow_federated.python.core.impl.federated_context import federated_computation
@@ -38,6 +39,23 @@ _UNUSED_UNFINALIZED_METRICS = collections.OrderedDict(
 
 
 class CustomSumMetric(tf_keras.metrics.Sum):
+  """A custom metric whose result is total + extra scalar and vector values."""
+
+  def __init__(self, name='custom_sum_metric'):
+    super().__init__(name=name, dtype=tf.int32)
+    self.scalar = self.add_weight(
+        name='scalar', shape=(), initializer='zeros', dtype=tf.int32
+    )
+    self.vector = self.add_weight(
+        name='vector', shape=(2,), initializer='zeros', dtype=tf.int32
+    )
+
+  # The method `update_state` is omitted here because only the `result` method
+  # is useful in the tests below.
+  def result(self):
+    return self.total + self.scalar + tf.reduce_sum(self.vector)
+
+class CustomSumMetricKeras3(keras.metrics.Sum):
   """A custom metric whose result is total + extra scalar and vector values."""
 
   def __init__(self, name='custom_sum_metric'):
@@ -100,6 +118,51 @@ _TEST_ARGUMENTS_KERAS_METRICS = {
 }
 
 
+_TEST_ARGUMENTS_KERAS3_METRICS = {
+    'testcase_name': 'keras3_metrics',
+    # Besides standard and custom Keras metrics, this test also covers the cases
+    # when the tensors in the unfinalized metrics have different numbers and
+    # different shapes.
+    'metric_finalizers': collections.OrderedDict(
+        accuracy=keras_finalizer.create_keras_metric_finalizer(
+            keras.metrics.SparseCategoricalAccuracy
+        ),
+        custom_sum=keras_finalizer.create_keras_metric_finalizer(
+            CustomSumMetricKeras3
+        ),
+    ),
+    'local_unfinalized_metrics_at_clients': [
+        collections.OrderedDict(
+            # The unfinalized `accuracy` has two values: `total` and `count`.
+            accuracy=[tf.constant(1.0), tf.constant(2.0)],
+            # The unfinalized `custom_sum` has three values: `total`, `scalar`,
+            # and `vector`.
+            custom_sum=[tf.constant(1), tf.constant(1), tf.constant([1, 1])],
+        ),
+        collections.OrderedDict(
+            accuracy=[tf.constant(3.0), tf.constant(6.0)],
+            custom_sum=[tf.constant(1), tf.constant(1), tf.constant([1, 1])],
+        ),
+    ],
+    'local_unfinalized_metrics_type': computation_types.to_type(
+        collections.OrderedDict(
+            accuracy=[np.float32, np.float32],
+            custom_sum=[
+                np.int32,
+                np.int32,
+                computation_types.TensorType(np.int32, [2]),
+            ],
+        ),
+    ),
+    # The finalized metrics are computed by first summing the unfinalized values
+    # from clients, and run the corresponding finalizers (a division for
+    # `accuracy`, and a sum for `custom_sum`) at the server.
+    'expected_aggregated_metrics': collections.OrderedDict(
+        accuracy=(1.0 + 3.0) / (2.0 + 6.0), custom_sum=8
+    ),
+}
+
+
 def _test_finalize_metrics(
     unfinalized_metrics: collections.OrderedDict[str, Any]
 ) -> collections.OrderedDict[str, Any]:
@@ -113,9 +176,56 @@ def _test_finalize_metrics(
   )
 
 
+def _test_finalize_metrics_keras3(
+    unfinalized_metrics: collections.OrderedDict[str, Any]
+) -> collections.OrderedDict[str, Any]:
+  return collections.OrderedDict(
+      accuracy=keras_finalizer.create_keras_metric_finalizer(
+          keras.metrics.SparseCategoricalAccuracy
+      )(unfinalized_metrics['accuracy']),
+      custom_sum=keras_finalizer.create_keras_metric_finalizer(CustomSumMetricKeras3)(
+          unfinalized_metrics['custom_sum']
+      ),
+  )
+
+
 _TEST_CALLABLE_ARGUMENTS_KERAS_METRICS = {
     'testcase_name': 'keras_metrics_callable_finalizers',
     'metric_finalizers': _test_finalize_metrics,
+    'local_unfinalized_metrics_at_clients': [
+        collections.OrderedDict(
+            # The unfinalized `accuracy` has two values: `total` and `count`.
+            accuracy=[tf.constant(1.0), tf.constant(2.0)],
+            # The unfinalized `custom_sum` has three values: `total`, `scalar`,
+            # and `vector`.
+            custom_sum=[tf.constant(1), tf.constant(1), tf.constant([1, 1])],
+        ),
+        collections.OrderedDict(
+            accuracy=[tf.constant(3.0), tf.constant(6.0)],
+            custom_sum=[tf.constant(1), tf.constant(1), tf.constant([1, 1])],
+        ),
+    ],
+    'local_unfinalized_metrics_type': computation_types.to_type(
+        collections.OrderedDict(
+            accuracy=[np.float32, np.float32],
+            custom_sum=[
+                np.int32,
+                np.int32,
+                computation_types.TensorType(np.int32, [2]),
+            ],
+        )
+    ),
+    # The finalized metrics are computed by first summing the unfinalized values
+    # from clients, and run the corresponding finalizers (a division for
+    # `accuracy`, and a sum for `custom_sum`) at the server.
+    'expected_aggregated_metrics': collections.OrderedDict(
+        accuracy=(1.0 + 3.0) / (2.0 + 6.0), custom_sum=8
+    ),
+}
+
+_TEST_CALLABLE_ARGUMENTS_KERAS3_METRICS = {
+    'testcase_name': 'keras3_metrics_callable_finalizers',
+    'metric_finalizers': _test_finalize_metrics_keras3,
     'local_unfinalized_metrics_at_clients': [
         collections.OrderedDict(
             # The unfinalized `accuracy` has two values: `total` and `count`.
@@ -261,8 +371,10 @@ class SumThenFinalizeTest(parameterized.TestCase, tf.test.TestCase):
 
   @parameterized.named_parameters(
       _TEST_ARGUMENTS_KERAS_METRICS,
+      _TEST_ARGUMENTS_KERAS3_METRICS,
       _TEST_ARGUMENTS_NON_KERAS_METRICS,
       _TEST_CALLABLE_ARGUMENTS_KERAS_METRICS,
+      _TEST_CALLABLE_ARGUMENTS_KERAS3_METRICS,
   )
   def test_returns_correct_results(
       self,
@@ -324,8 +436,10 @@ class SecureSumThenFinalizeTest(parameterized.TestCase, tf.test.TestCase):
 
   @parameterized.named_parameters(
       _TEST_ARGUMENTS_KERAS_METRICS,
+      _TEST_ARGUMENTS_KERAS3_METRICS,
       _TEST_ARGUMENTS_NON_KERAS_METRICS,
       _TEST_CALLABLE_ARGUMENTS_KERAS_METRICS,
+      _TEST_CALLABLE_ARGUMENTS_KERAS3_METRICS,
       _TEST_METRICS_MIXED_DTYPES,
   )
   def test_default_value_ranges_returns_correct_results(
@@ -406,6 +520,98 @@ class SecureSumThenFinalizeTest(parameterized.TestCase, tf.test.TestCase):
         ),
         custom_sum=keras_finalizer.create_keras_metric_finalizer(
             CustomSumMetric
+        ),
+    )
+    local_unfinalized_metrics_at_clients = [
+        collections.OrderedDict(
+            # The unfinalized `accuracy` has two values: `total` and `count`.
+            accuracy=[tf.constant(1.0), tf.constant(2.0)],
+            # The unfinalized `custom_sum` has three values: `total`, `scalar`,
+            # and `vector`.
+            custom_sum=[tf.constant(1), tf.constant(1), tf.constant([1, 1])],
+        ),
+        collections.OrderedDict(
+            accuracy=[tf.constant(3.0), tf.constant(6.0)],
+            custom_sum=[tf.constant(1), tf.constant(1), tf.constant([1, 1])],
+        ),
+    ]
+    polymorphic_aggregator_computation = aggregator.secure_sum_then_finalize(
+        metric_finalizers=metric_finalizers,
+        # Note: Partial specification, only the `accuracy` metrics denominator
+        # variable has a different range; all others get the default.
+        metric_value_ranges=collections.OrderedDict(
+            accuracy=[
+                None,
+                (0.0, 1.0),
+            ]
+        ),
+    )
+
+    # Concretize on a federated type with CLIENTS placement so that the method
+    # invocation understands to interpret python lists of values as CLIENTS
+    # placed values.
+    @federated_computation.federated_computation(
+        computation_types.FederatedType(
+            collections.OrderedDict(
+                accuracy=[
+                    computation_types.TensorType(np.float32),
+                    computation_types.TensorType(np.float32),
+                ],
+                custom_sum=[
+                    computation_types.TensorType(np.int32),
+                    computation_types.TensorType(np.int32),
+                    computation_types.TensorType(dtype=np.int32, shape=(2,)),
+                ],
+            ),
+            placements.CLIENTS,
+        )
+    )
+    def aggregator_computation(unfinalized_metrics):
+      return polymorphic_aggregator_computation(unfinalized_metrics)
+
+    aggregated_metrics = aggregator_computation(
+        local_unfinalized_metrics_at_clients
+    )
+
+    expected_secure_sum_measurements = collections.OrderedDict()
+    # The metric values are grouped into three `factory_key`s. The first group
+    # only has `accoracy/0`.
+    factory_key = sum_aggregation_factory.create_factory_key(
+        0.0, float(aggregator.DEFAULT_SECURE_UPPER_BOUND), tf.float32
+    )
+    expected_secure_sum_measurements[factory_key] = self._clipped_values(0)
+    # The second `factory_key` only has `accuracy/1`. Both clients get clipped.
+    factory_key = sum_aggregation_factory.create_factory_key(
+        0.0, 1.0, tf.float32
+    )
+    expected_secure_sum_measurements[factory_key] = self._clipped_values(2, 1.0)
+    # The third `factory_key` covers 3 values in `custom_sum`.
+    factory_key = sum_aggregation_factory.create_factory_key(
+        0, int(aggregator.DEFAULT_SECURE_UPPER_BOUND), tf.int32
+    )
+    expected_secure_sum_measurements[factory_key] = self._clipped_values(0)
+    secure_sum_measurements = aggregated_metrics.pop('secure_sum_measurements')
+    self.assertAllEqual(
+        secure_sum_measurements, expected_secure_sum_measurements
+    )
+
+    expected_aggregated_metrics = collections.OrderedDict(
+        accuracy=(1.0 + 3.0) /
+        # The accuracy denominator is clipped to the range [0.0, 1.0]
+        (1.0 + 1.0),
+        custom_sum=8.0,
+    )
+    self.assertAllClose(
+        aggregated_metrics, expected_aggregated_metrics, rtol=1e-5, atol=1e-5
+    )
+
+  def test_user_value_ranges_returns_correct_results_keras3(self):
+    metric_finalizers = collections.OrderedDict(
+        accuracy=keras_finalizer.create_keras_metric_finalizer(
+            keras.metrics.SparseCategoricalAccuracy
+        ),
+        custom_sum=keras_finalizer.create_keras_metric_finalizer(
+            CustomSumMetricKeras3
         ),
     )
     local_unfinalized_metrics_at_clients = [
@@ -621,10 +827,82 @@ class SecureSumThenFinalizeTest(parameterized.TestCase, tf.test.TestCase):
             metric_finalizers=metric_finalizers
         )(unfinalized_metrics)
 
+  def test_user_value_ranges_fails_invalid_dtype_keras3(self):
+    class TestConcatMetric(keras.metrics.Metric):
+      """A custom metric that concatenates strings."""
+
+      def __init__(self, name='custom_concat_metric'):
+        super().__init__(name=name, dtype=tf.string)
+        self._value = self.add_weight(
+            name='value', shape=(), initializer='zeros', dtype=tf.string
+        )
+
+      def update_state(self, value):
+        self._value.assign(tf.concat([self._value, value], axis=0))
+
+      def result(self):
+        return self._value.read_value()
+
+    metric_finalizers = collections.OrderedDict(
+        custom_sum=keras_finalizer.create_keras_metric_finalizer(
+            TestConcatMetric
+        )
+    )
+    with self.assertRaises(sum_aggregation_factory.UnquantizableDTypeError):
+
+      # Concretize on a federated type with CLIENTS placement so that the method
+      # invocation understands to interpret python lists of values as CLIENTS
+      # placed values.
+      @federated_computation.federated_computation(
+          computation_types.FederatedType(
+              collections.OrderedDict(
+                  custom_sum=computation_types.TensorType(tf.string),
+              ),
+              placements.CLIENTS,
+          )
+      )
+      def _aggregator_computation(unfinalized_metrics):
+        return aggregator.secure_sum_then_finalize(
+            metric_finalizers=metric_finalizers
+        )(unfinalized_metrics)
+
   def test_user_value_ranges_fails_not_2_tuple(self):
     metric_finalizers = collections.OrderedDict(
         accuracy=keras_finalizer.create_keras_metric_finalizer(
             tf_keras.metrics.SparseCategoricalAccuracy
+        )
+    )
+    with self.assertRaisesRegex(ValueError, 'must be defined as a 2-tuple'):
+      # Concretize on a federated type with CLIENTS placement so that the method
+      # invocation understands to interpret python lists of values as CLIENTS
+      # placed values.
+      @federated_computation.federated_computation(
+          computation_types.FederatedType(
+              collections.OrderedDict(
+                  accuracy=[
+                      computation_types.TensorType(np.float32),
+                      computation_types.TensorType(np.float32),
+                  ],
+              ),
+              placements.CLIENTS,
+          )
+      )
+      def _aggregator_computation(unfinalized_metrics):
+        return aggregator.secure_sum_then_finalize(
+            metric_finalizers=metric_finalizers,
+            metric_value_ranges=collections.OrderedDict(
+                accuracy=[
+                    # Invalid specification
+                    (0.0, 1.0, 2.0),
+                    None,
+                ]
+            ),
+        )(unfinalized_metrics)
+
+  def test_user_value_ranges_fails_not_2_tuple_keras3(self):
+    metric_finalizers = collections.OrderedDict(
+        accuracy=keras_finalizer.create_keras_metric_finalizer(
+            keras.metrics.SparseCategoricalAccuracy
         )
     )
     with self.assertRaisesRegex(ValueError, 'must be defined as a 2-tuple'):

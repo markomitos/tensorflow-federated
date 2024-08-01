@@ -23,6 +23,7 @@ py_library(
     srcs = ["model_weights.py"],
     deps = [
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/common_libs:structure",
         "//tensorflow_federated/python/core/impl/types:computation_types",
@@ -48,6 +49,7 @@ py_library(
     srcs = ["functional.py"],
     deps = [
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/learning/metrics:keras_finalizer",
         "//tensorflow_federated/python/learning/metrics:keras_utils",
@@ -77,6 +79,7 @@ py_library(
     srcs = ["keras_utils.py"],
     deps = [
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/core/environments/tensorflow_frontend:tensorflow_computation",
         "//tensorflow_federated/python/core/impl/federated_context:intrinsics",
@@ -97,6 +100,7 @@ py_test(
         ":model_examples",
         ":model_weights",
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/core/backends/native:execution_contexts",
         "//tensorflow_federated/python/core/environments/tensorflow_frontend:tensorflow_computation",
         "//tensorflow_federated/python/core/impl/computation:computation_base",
@@ -159,6 +163,7 @@ py_library(
     deps = [
         ":model_weights",
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/core/impl/types:computation_types",
     ],
 )

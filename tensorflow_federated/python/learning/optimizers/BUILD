@@ -93,7 +93,10 @@ py_library(
 py_library(
     name = "keras_optimizer",
     srcs = ["keras_optimizer.py"],
-    deps = [":optimizer"],
+    deps = [
+        ":optimizer",
+        "//tensorflow_federated/python/common_libs:keras_compat",
+    ],
 )
 
 py_test(

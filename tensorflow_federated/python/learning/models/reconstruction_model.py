@@ -16,10 +16,12 @@
 import abc
 import collections
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple, Optional, Union
 
+import keras
 import tensorflow as tf
 import tf_keras
+from tensorflow_federated.python.common_libs import keras_compat
 
 from tensorflow_federated.python.core.impl.types import computation_types
 from tensorflow_federated.python.learning.models import model_weights
@@ -334,10 +336,10 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
   @classmethod
   def from_keras_model_and_layers(
       cls,
-      keras_model: tf_keras.Model,
+      keras_model: Union[tf_keras.Model, keras.Model],
       *,  # Caller passes below args by name.
-      global_layers: Iterable[tf_keras.layers.Layer],
-      local_layers: Iterable[tf_keras.layers.Layer],
+      global_layers: Union[Iterable[tf_keras.layers.Layer], Iterable[keras.layers.Layer]],
+      local_layers: Union[Iterable[tf_keras.layers.Layer], Iterable[keras.layers.Layer]],
       input_spec: Any,
   ) -> 'ReconstructionModel':
     """Builds a `tff.learning.models.ReconstructionModel` from a `tf_keras.Model`.
@@ -406,7 +408,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
   @classmethod
   def from_keras_model_and_variables(
       cls,
-      keras_model: tf_keras.Model,
+      keras_model: Union[tf_keras.Model, keras.Model],
       *,  # Caller passes below args by name.
       global_trainable_variables: Iterable[tf.Variable],
       global_non_trainable_variables: Iterable[tf.Variable],
@@ -509,19 +511,19 @@ class _KerasReconstructionModel(ReconstructionModel):
 
   def __init__(
       self,
-      inner_model: tf_keras.Model,
+      inner_model: Union[tf_keras.Model, keras.Model],
       global_trainable_variables: Iterable[tf.Variable],
       global_non_trainable_variables: Iterable[tf.Variable],
       local_trainable_variables: Iterable[tf.Variable],
       local_non_trainable_variables: Iterable[tf.Variable],
       input_spec: computation_types.Type,
   ):
-    if not isinstance(inner_model, tf_keras.Model):
+    if not isinstance(inner_model, (tf_keras.Model, keras.Model)):
       raise TypeError(
           'Expected `inner_model` to be type `tf_keras.Model`, '
           f'found {type(inner_model)}'
       )
-    if inner_model._is_compiled:  # pylint: disable=protected-access
+    if keras_compat.is_compiled(inner_model):  # pylint: disable=protected-access
       raise ValueError('`inner_model` must not be compiled.')
     if not inner_model.built:
       raise ValueError(
@@ -542,16 +544,16 @@ class _KerasReconstructionModel(ReconstructionModel):
     # each other.
     var_refs_sets = {
         'global_trainable_variables': set(
-            [var.ref() for var in self._global_trainable_variables]
+            [keras_compat.ref(var) for var in self._global_trainable_variables]
         ),
         'global_non_trainable_variables': set(
-            [var.ref() for var in self._global_non_trainable_variables]
+            [keras_compat.ref(var) for var in self._global_non_trainable_variables]
         ),
         'local_trainable_variables': set(
-            [var.ref() for var in self._local_trainable_variables]
+            [keras_compat.ref(var) for var in self._local_trainable_variables]
         ),
         'local_non_trainable_variables': set(
-            [var.ref() for var in self._local_non_trainable_variables]
+            [keras_compat.ref(var) for var in self._local_non_trainable_variables]
         ),
     }
     for first_key in list(var_refs_sets):
@@ -576,12 +578,12 @@ class _KerasReconstructionModel(ReconstructionModel):
         + self._local_trainable_variables
         + self._local_non_trainable_variables
     ):
-      global_and_local_variables.add((var.ref(), var.name))
+      global_and_local_variables.add((keras_compat.ref(var), var.name))
 
     keras_variables = set(
-        (var.ref(), var.name)
-        for var in inner_model.trainable_variables
-        + inner_model.non_trainable_variables
+      (keras_compat.ref(var), var.name)
+      for var in inner_model.trainable_variables
+      + inner_model.non_trainable_variables
     )
 
     if global_and_local_variables != keras_variables:
@@ -663,7 +665,7 @@ def global_weights_type_from_model(
   global_model_weights = ReconstructionModel.get_global_variables(model)
 
   def _variable_to_type(x: tf.Variable) -> computation_types.Type:
-    return computation_types.tensorflow_to_type((x.dtype, x.shape))
+    return computation_types.tensorflow_to_type((keras_compat.keras_dtype_to_tf(x.dtype), x.shape))
 
   model_weights_type = tf.nest.map_structure(
       _variable_to_type, global_model_weights
