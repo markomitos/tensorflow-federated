@@ -18,6 +18,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import factory_utils
 from tensorflow_federated.python.core.test import static_assert
@@ -44,6 +45,28 @@ class FedAvgTest(parameterized.TestCase):
       ],
   )
   def test_construction_calls_model_fn(self, optimizer_fn, aggregation_factory):
+    # Assert that the process building does not call `model_fn` too many times.
+    # `model_fn` can potentially be expensive (loading weights, processing, etc
+    # ).
+    mock_model_fn = mock.Mock(side_effect=model_examples.LinearRegression)
+    fed_avg.build_weighted_fed_avg(
+        model_fn=mock_model_fn,
+        client_optimizer_fn=optimizer_fn,
+        model_aggregator=aggregation_factory(),
+    )
+    self.assertEqual(mock_model_fn.call_count, 3)
+
+  @parameterized.product(
+      optimizer_fn=[
+          keras.optimizers.SGD,
+          sgdm.build_sgdm(learning_rate=0.1),
+      ],
+      aggregation_factory=[
+          model_update_aggregator.robust_aggregator,
+          model_update_aggregator.secure_aggregator,
+      ],
+  )
+  def test_construction_calls_model_fn_keras3(self, optimizer_fn, aggregation_factory):
     # Assert that the process building does not call `model_fn` too many times.
     # `model_fn` can potentially be expensive (loading weights, processing, etc
     # ).
@@ -144,11 +167,39 @@ class FedAvgTest(parameterized.TestCase):
         learning_process.next
     )
 
+  def test_weighted_fed_avg_with_only_secure_aggregation_keras3(self):
+    model_fn = model_examples.LinearRegression
+    learning_process = fed_avg.build_weighted_fed_avg(
+        model_fn,
+        client_optimizer_fn=lambda: keras.optimizers.SGD(1.0),
+        model_aggregator=model_update_aggregator.secure_aggregator(
+            weighted=True
+        ),
+        metrics_aggregator=aggregator.secure_sum_then_finalize,
+    )
+    static_assert.assert_not_contains_unsecure_aggregation(
+        learning_process.next
+    )
+
   def test_unweighted_fed_avg_with_only_secure_aggregation(self):
     model_fn = model_examples.LinearRegression
     learning_process = fed_avg.build_unweighted_fed_avg(
         model_fn,
         client_optimizer_fn=lambda: tf_keras.optimizers.SGD(1.0),
+        model_aggregator=model_update_aggregator.secure_aggregator(
+            weighted=False
+        ),
+        metrics_aggregator=aggregator.secure_sum_then_finalize,
+    )
+    static_assert.assert_not_contains_unsecure_aggregation(
+        learning_process.next
+    )
+
+  def test_unweighted_fed_avg_with_only_secure_aggregation_keras3(self):
+    model_fn = model_examples.LinearRegression
+    learning_process = fed_avg.build_unweighted_fed_avg(
+        model_fn,
+        client_optimizer_fn=lambda: keras.optimizers.SGD(1.0),
         model_aggregator=model_update_aggregator.secure_aggregator(
             weighted=False
         ),
@@ -191,6 +242,27 @@ class FunctionalFedAvgTest(parameterized.TestCase):
             model_fn=model,
             client_optimizer_fn=sgdm.build_sgdm(learning_rate=0.1),
             server_optimizer_fn=tf_keras.optimizers.SGD,
+        )
+
+  @parameterized.named_parameters(
+      ('weighted', fed_avg.build_weighted_fed_avg),
+      ('unweighted', fed_avg.build_unweighted_fed_avg),
+  )
+  def test_raises_on_non_tff_optimizer_keras3(self, constructor):
+    model = test_models.build_functional_linear_regression()
+    with self.subTest('client_optimizer'):
+      with self.assertRaisesRegex(TypeError, 'client_optimizer_fn'):
+        constructor(
+            model_fn=model,
+            client_optimizer_fn=keras.optimizers.SGD,
+            server_optimizer_fn=sgdm.build_sgdm(),
+        )
+    with self.subTest('server_optimizer'):
+      with self.assertRaisesRegex(TypeError, 'server_optimizer_fn'):
+        constructor(
+            model_fn=model,
+            client_optimizer_fn=sgdm.build_sgdm(learning_rate=0.1),
+            server_optimizer_fn=keras.optimizers.SGD,
         )
 
   @parameterized.named_parameters(

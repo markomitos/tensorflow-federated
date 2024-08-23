@@ -49,6 +49,7 @@ from typing import Any, Optional, Union
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import factory
 from tensorflow_federated.python.aggregators import factory_utils
@@ -73,18 +74,21 @@ from tensorflow_federated.python.learning.templates import composers
 from tensorflow_federated.python.learning.templates import distributors
 from tensorflow_federated.python.learning.templates import learning_process
 from tensorflow_federated.python.tensorflow_libs import tensor_utils
+from tensorflow_federated.python.common_libs import keras_compat
 
 # Type aliases for readability.
 ReconstructionModel = reconstruction_model.ReconstructionModel
 AggregationFactory = Union[
     factory.WeightedAggregationFactory, factory.UnweightedAggregationFactory
 ]
-LossFn = Callable[[], tf_keras.losses.Loss]
-MetricsFn = Callable[[], list[tf_keras.metrics.Metric]]
+LossFn = Union[Callable[[], tf_keras.losses.Loss], Callable[[], keras.losses.Loss]]
+MetricsFn = Union[Callable[[], list[tf_keras.metrics.Metric]], Callable[[], list[keras.metrics.Metric]]]
 MetricFinalizersType = collections.OrderedDict[str, Callable[[Any], Any]]
 ModelFn = Callable[[], ReconstructionModel]
 OptimizerFn = Union[
-    Callable[[], tf_keras.optimizers.Optimizer], optimizer_base.Optimizer
+    Callable[[], tf_keras.optimizers.Optimizer],
+    Callable[[], keras.optimizers.Optimizer],
+    optimizer_base.Optimizer
 ]
 
 
@@ -110,23 +114,26 @@ def _build_reconstruction_client_work(
   Args:
     model_fn: A no-arg function that returns a
       `tff.learning.models.ReconstructionModel`.
-    loss_fn: A no-arg function returning a `tf_keras.losses.Loss` to use to
-      compute local model updates during reconstruction and post-reconstruction
-      and evaluate the model during training. The final loss metric is the
-      example-weighted mean loss across batches and across clients. The loss
-      metric does not include reconstruction batches in the loss.
+    loss_fn: A no-arg function returning a `tf_keras.losses.Loss` or
+      a `keras.losses.Loss` to use to compute local model updates during
+      reconstruction and post-reconstruction and evaluate the model during training.
+      The final loss metric is the example-weighted mean loss across batches
+      and across clients. The loss metric does not include reconstruction
+      batches in the loss.
     metrics_fn: A no-arg function returning a list of `tf_keras.metrics.Metric`s
-      to evaluate the model. Metrics results are computed locally as described
-      by the metric, and are aggregated across clients as in
+      or keras.metrics.Metric`s to evaluate the model. Metrics results are computed
+      locally as described by the metric, and are aggregated across clients as in
       `federated_aggregate_keras_metric`. If None, no metrics are applied.
       Metrics are not computed on reconstruction batches.
     client_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      function that returns a `tf_keras.optimizers.Optimizer` for training the
-      model weights on the client post-reconstruction.
+      function that returns a `tf_keras.optimizers.Optimizer` or a
+      `keras.optimizers.Optimizer` for training the model weights
+       on the client post-reconstruction.
     reconstruction_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a
-      no-arg function that returns a `tf_keras.optimizers.Optimizer` for
-      reconstructing the local variables with global variables frozen. This
-      optimizer is used before the one given by `client_optimizer_fn`.
+      no-arg function that returns a `tf_keras.optimizers.Optimizer` or a
+      `tf_keras.optimizers.Optimizer` for reconstructing the local variables
+      with global variables frozen. This optimizer is used before the one
+      given by `client_optimizer_fn`.
     dataset_split_fn: A `tff.learning.models.ReconstructionDatasetSplitFn`
       taking in aclient dataset and producing two TF datasets. The first is
       iterated overduring reconstruction, and the second is iterated over
@@ -182,7 +189,10 @@ def _build_reconstruction_client_work(
     """
     with tf.init_scope():
       model = model_fn()
-      loss_metric = tf_keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
+      if keras_compat.is_keras3(model):
+        loss_metric = keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
+      else:
+        loss_metric = tf_keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
       if metrics_fn is None:
         metrics = [loss_metric]
       else:
@@ -420,26 +430,27 @@ def build_fed_recon(
       Tensorflow tensors or variables and use them. must be constructed entirely
       from scratch on each invocation, returning the same pre-constructed model
       each call will result in an error.
-    loss_fn: A no-arg function returning a `tf_keras.losses.Loss` to use to
-      compute local model updates during reconstruction and post-reconstruction
-      and evaluate the model during training. The final loss metric is the
-      example-weighted mean loss across batches and across clients. The loss
-      metric does not include reconstruction batches in the loss.
+    loss_fn: A no-arg function returning a `tf_keras.losses.Loss` or
+      a `keras.losses.Loss` to use to compute local model updates during
+      reconstruction and post-reconstruction and evaluate the model during training.
+      The final loss metric is the example-weighted mean loss across batches and
+      across clients. The loss metric does not include reconstruction batches in the loss.
     metrics_fn: A no-arg function returning a list of `tf_keras.metrics.Metric`s
-      to evaluate the model. Metrics results are computed locally as described
-      by the metric, and are aggregated across clients as in
+      or `keras.metrics.Metric`s to evaluate the model. Metrics results are computed
+      locally as described by the metric, and are aggregated across clients as in
       `federated_aggregate_keras_metric`. If None, no metrics are applied.
       Metrics are not computed on reconstruction batches.
     server_optimizer_fn:  A `tff.learning.optimizers.Optimizer`, or a no-arg
-      function that returns a `tf_keras.optimizers.Optimizer` for applying
-      updates to the global model on the server.
+      function that returns a `tf_keras.optimizers.Optimizer` or a
+      `keras.optimizers.Optimizer` for applying updates to the global model
+      on the server.
     client_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      function that returns a `tf_keras.optimizers.Optimizer` for local client
-      training after reconstruction.
+      function that returns a `tf_keras.optimizers.Optimizer` or a
+      `keras.optimizers.Optimizer` for local client training after reconstruction.
     reconstruction_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a
-      no-arg function that returns a `tf_keras.optimizers.Optimizer` used to
-      reconstruct the local variables, with the global ones frozen, or the first
-      stage described above.
+      no-arg function that returns a `tf_keras.optimizers.Optimizer` or a
+      `keras.optimizers.Optimizer` used to reconstruct the local variables,
+      with the global ones frozen, or the first stage described above.
     dataset_split_fn: A `tff.learning.models.ReconstructionDatasetSplitFn`
       taking in a single TF dataset and producing two TF datasets. The first is
       iterated over during reconstruction, and the second is iterated over

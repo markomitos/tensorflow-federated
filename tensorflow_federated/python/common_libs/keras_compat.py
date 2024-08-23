@@ -143,3 +143,35 @@ def ref(variable: Union[tf.Variable, keras.Variable, keras_common.KerasVariable]
   else:
     raise TypeError(f'Expected keras.Variable, keras.backend.common.KerasVariable or tf.Variable, but got {type(variable)}')
 
+
+def get_variable(variable: Union[tf.Variable, keras.Variable, keras_common.KerasVariable]):
+  """
+  Returns the variable value of a Keras or TensorFlow variable.
+
+  Args:
+    variable: An instance of a tf.Variable, a keras.backend.common.KerasVariable
+     or a keras.Variable.
+
+  Returns:
+    Value of the variable if it is from the keras 3 library,
+    otherwise returns the variable.
+  """
+  if isinstance(variable, (keras.Variable, keras_common.KerasVariable)):
+    return variable.value
+  else:
+    return variable
+
+
+def get_variables(variables: Union[list, tuple]):
+  """
+  Returns the variable value of a Keras or TensorFlow variable.
+
+  Args:
+    variables: A list or a tuple of instances of tf.Variable, keras.backend.common.KerasVariable
+     or keras.Variable.
+
+  Returns:
+    Value of the variables if they are from the keras 3 library,
+    otherwise returns the variables.
+  """
+  return [get_variable(var) for var in variables]

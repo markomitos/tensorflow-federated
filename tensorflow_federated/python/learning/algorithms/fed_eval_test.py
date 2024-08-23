@@ -21,6 +21,7 @@ from absl.testing import absltest
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -466,6 +467,7 @@ class FunctionalFedEvalProcessTest(tf.test.TestCase):
     with self.assertRaisesRegex(TypeError, 'is not a callable'):
       fed_eval.build_fed_eval(model_fn=0)
 
+  #TODO check test again after fixing functional
   @tensorflow_test_utils.skip_test_for_gpu
   def test_functional_evaluation_matches_non_functional(self):
     datasets = self.create_test_datasets()
@@ -496,7 +498,49 @@ class FunctionalFedEvalProcessTest(tf.test.TestCase):
       )
 
     functional_model = functional.functional_model_from_keras(
-        keras_model=keras_model_fn,
+        keras_model=keras_model_fn(),
+        loss_fn=loss_fn(),
+        input_spec=batch_type,
+        metrics_constructor=build_metrics_fn,
+    )
+    functional_eval_process = fed_eval.build_fed_eval(functional_model)
+    functional_eval_state = functional_eval_process.initialize()
+    functional_eval_output = functional_eval_process.next(
+        functional_eval_state, datasets
+    )
+    self.assertDictEqual(eval_output.metrics, functional_eval_output.metrics)
+
+  @tensorflow_test_utils.skip_test_for_gpu
+  def test_functional_evaluation_matches_non_functional_keras3(self):
+    datasets = self.create_test_datasets()
+    batch_type = computation_types.tensorflow_to_type(datasets[0].element_spec)
+    loss_fn = keras.losses.MeanSquaredError
+    keras_model_fn = functools.partial(
+        model_examples.build_linear_regression_keras3_functional_model,
+        feature_dims=2,
+    )
+
+    # Defining artifacts using `tff.learning.models.VariableModel`
+    def tff_model_fn():
+      keras_model = keras_model_fn()
+      return keras_utils.from_keras_model(
+          keras_model, loss=loss_fn(), input_spec=batch_type
+      )
+
+    eval_process = fed_eval.build_fed_eval(tff_model_fn)
+    eval_state = eval_process.initialize()
+    eval_output = eval_process.next(eval_state, datasets)
+
+    # Defining artifacts using `tff.learning.models.FunctionalModel`
+    def build_metrics_fn():
+      return collections.OrderedDict(
+          loss=keras.metrics.MeanSquaredError(),
+          num_examples=counters.Keras3NumExamplesCounter(),
+          num_batches=counters.Keras3NumBatchesCounter(),
+      )
+
+    functional_model = functional.functional_model_from_keras(
+        keras_model=keras_model_fn(),
         loss_fn=loss_fn(),
         input_spec=batch_type,
         metrics_constructor=build_metrics_fn,

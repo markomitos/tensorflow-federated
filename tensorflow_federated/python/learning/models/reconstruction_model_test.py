@@ -16,7 +16,6 @@
 import collections
 from typing import Optional
 
-import absl.testing.absltest
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
@@ -425,7 +424,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     ):
       self.assertIs(var, expected_var)
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_layers_with_only_global_layers(self):
     keras_model = _get_two_layer_keras3_model()
     local_layers = []
@@ -509,7 +507,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     )
     self.assertTrue(global_model_weights_type.is_equivalent_to(expected_type))
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_global_weights_type_with_only_global_layers_keras3(self):
     keras_model = _get_two_layer_keras3_model()
     local_layers = []
@@ -588,7 +585,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
         batch_output_only_global.num_examples,
     )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_forward_pass_is_same_regardless_of_global_local_layer_split_keras3(self):
     keras_model = _get_two_layer_keras3_model()
     input_spec = _get_input_spec()
@@ -688,7 +684,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
               ),
       ),
   )
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_bad_input_spec_raises_error_keras3(self, input_spec):
       keras_model = _get_two_layer_keras3_model()
 
@@ -718,7 +713,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
           input_spec=input_spec,
       )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_layers_with_local_layer_not_in_model_raises_error(
       self,
   ):
@@ -755,7 +749,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
           input_spec=input_spec,
       )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_layers_with_global_layer_not_in_model_raises_error(
       self,
   ):
@@ -797,7 +790,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
           input_spec=input_spec,
       )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_layers_non_disjoint_global_and_local_vars_raises_error(
       self,
   ):
@@ -874,7 +866,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     ):
       self.assertIs(var, expected_var)
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_variables_with_global_and_local_variables(self):
     keras_model = _get_two_layer_keras3_model()
     input_spec = _get_input_spec()
@@ -970,7 +961,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
     ):
       self.assertIs(var, expected_var)
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_variables_with_only_global_variables(self):
     keras_model = _get_two_layer_keras3_model()
     input_spec = _get_input_spec()
@@ -1036,7 +1026,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
           input_spec=input_spec,
       )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_variables_with_local_variable_not_in_model_raises_error(
       self,
   ):
@@ -1077,7 +1066,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
           input_spec=input_spec,
       )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_variables_with_global_variable_not_in_model_raises_error(
       self,
   ):
@@ -1127,7 +1115,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
           input_spec=input_spec,
       )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_variables_non_disjoint_global_and_local_variables_raises_error(
       self,
   ):
@@ -1175,7 +1162,6 @@ class ReconstructionModelTest(tf.test.TestCase, parameterized.TestCase):
           input_spec=input_spec,
       )
 
-  @absl.testing.absltest.skip("Reconstruction is not yet supported by keras 3")
   def test_from_keras3_model_and_variables_raises_error_if_model_not_built(self):
     keras_model = _get_unbuilt_keras3_model()
     global_trainable_vars = keras_model.layers[1].trainable_variables

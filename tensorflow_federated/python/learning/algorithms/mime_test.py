@@ -19,6 +19,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import factory_utils
 from tensorflow_federated.python.aggregators import mean
@@ -148,6 +149,14 @@ class MimeLiteClientWorkComputationTest(
       mime._build_mime_lite_client_work(
           model_examples.LinearRegression,
           lambda: tf_keras.optimizers.SGD(1.0),
+          client_weighting=client_weight_lib.ClientWeighting.NUM_EXAMPLES,
+      )
+
+  def test_keras3_optimizer_raises(self):
+    with self.assertRaises(TypeError):
+      mime._build_mime_lite_client_work(
+          model_examples.LinearRegression,
+          lambda: keras.optimizers.SGD(1.0),
           client_weighting=client_weight_lib.ClientWeighting.NUM_EXAMPLES,
       )
 
