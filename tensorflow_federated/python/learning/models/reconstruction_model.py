@@ -330,7 +330,7 @@ class ReconstructionModel(metaclass=abc.ABCMeta):
             f'Duplicate metric name detected: {metric.name}. '
             f'Already saw metrics {list(metric_variables.keys())}'
         )
-      metric_variables[metric.name] = [v.read_value() for v in metric.variables]
+      metric_variables[metric.name] = [v.read_value() if hasattr(v, "read_value") else v.value for v in metric.variables]
     return metric_variables
 
   @classmethod

@@ -31,6 +31,7 @@ from typing import Any, Optional
 
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import mean
 from tensorflow_federated.python.common_libs import py_typecheck
@@ -51,6 +52,7 @@ from tensorflow_federated.python.learning.templates import composers
 from tensorflow_federated.python.learning.templates import distributors
 from tensorflow_federated.python.learning.templates import finalizers
 from tensorflow_federated.python.learning.templates import learning_process as learning_process_lib
+from tensorflow_federated.python.common_libs import keras_compat
 
 
 _AggregationProcess = aggregation_process.AggregationProcess
@@ -92,18 +94,20 @@ def build_fed_recon_eval(
       Tensorflow tensors or variables and use them. Must be constructed entirely
       from scratch on each invocation, returning the same pre-constructed model
       each call will result in an error.
-    loss_fn: A no-arg function returning a `tf_keras.losses.Loss` to use to
-      reconstruct and evaluate the model. The loss will be applied to the
-      model's outputs during the evaluation stage. The final loss metric is the
-      example-weighted mean loss across batches (and across clients).
+    loss_fn: A no-arg function returning a `tf_keras.losses.Loss` or a
+      `keras.losses.Loss` to use to reconstruct and evaluate the model.
+      The loss will be applied to the model's outputs during the evaluation stage.
+      The final loss metric is the example-weighted mean loss across batches
+      (and across clients).
     metrics_fn: A no-arg function returning a list of `tf_keras.metrics.Metric`s
-      to evaluate the model. The metrics will be applied to the model's outputs
-      during the evaluation stage. Final metric values are the example-weighted
-      mean of metric values across batches (and across clients). If None, no
-      metrics are applied.
+      or `keras.metrics.Metric`s to evaluate the model. The metrics will be applied
+      to the model's outputs during the evaluation stage. Final metric values are
+      the example-weighted mean of metric values across batches (and across clients).
+      If None, no metrics are applied.
     reconstruction_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a
-      no-arg function that returns a `tf_keras.optimizers.Optimizer` used to
-      reconstruct the local variables with the global ones frozen.
+      no-arg function that returns a `tf_keras.optimizers.Optimizer` or a
+      `keras.optimizers.Optimizer` used to reconstruct the local variables
+      with the global ones frozen.
     dataset_split_fn: A `tff.learning.models.ReconstructionDatasetSplitFn`
       taking in a single TF dataset and producing two TF datasets. The first is
       iterated over during reconstruction, and the second is iterated over
@@ -184,7 +188,12 @@ def build_fed_recon_eval(
             client_model
         )
     )
-    loss_metric = tf_keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
+    variables = client_model.get_global_variables(client_model)
+    is_keras3 = any(keras_compat.is_keras3(v) for variables in variables for v in variables)
+    if is_keras3:
+      loss_metric = keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
+    else:
+      loss_metric = tf_keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
     if metrics_fn is None:
       metrics = [loss_metric]
     else:
@@ -204,7 +213,7 @@ def build_fed_recon_eval(
 
     reconstruction_optimizer = keras_optimizer.build_or_verify_tff_optimizer(
         reconstruction_optimizer_fn,
-        client_local_weights.trainable,
+        keras_compat.get_variables(client_local_weights.trainable),
         disjoint_init_and_next=False,
     )
 

@@ -64,6 +64,7 @@ py_test(
     deps = [
         ":functional",
         ":variable",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/core/backends/native:execution_contexts",
         "//tensorflow_federated/python/core/impl/federated_context:federated_computation",
         "//tensorflow_federated/python/core/impl/types:computation_types",

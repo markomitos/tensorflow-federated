@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_privacy as tfp
 import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import differential_privacy
 from tensorflow_federated.python.aggregators import factory
@@ -93,6 +94,41 @@ def _create_keras_model():
   return model
 
 
+def _create_keras3_model():
+  initializer =keras.initializers.RandomNormal(seed=0)
+  max_pool = keras.layers.MaxPooling2D(
+      (2, 2), (2, 2), padding='same', data_format='channels_last'
+  )
+  model = keras.Sequential([
+      keras.layers.Reshape(target_shape=[28, 28, 1], input_shape=(28 * 28,)),
+      keras.layers.Conv2D(
+          32,
+          5,
+          padding='same',
+          data_format='channels_last',
+          activation=tf.nn.relu,
+          kernel_initializer=initializer,
+      ),
+      max_pool,
+      keras.layers.Conv2D(
+          64,
+          5,
+          padding='same',
+          data_format='channels_last',
+          activation=tf.nn.relu,
+          kernel_initializer=initializer,
+      ),
+      max_pool,
+      keras.layers.Flatten(),
+      keras.layers.Dense(
+          1024, activation=tf.nn.relu, kernel_initializer=initializer
+      ),
+      keras.layers.Dropout(0.4, seed=1),
+      keras.layers.Dense(10, kernel_initializer=initializer),
+  ])
+  return model
+
+
 def global_recon_model_fn():
   """Keras MNIST model with no local variables."""
   keras_model = _create_keras_model()
@@ -105,9 +141,33 @@ def global_recon_model_fn():
   )
 
 
+def global_recon_model_fn_keras3():
+  """Keras MNIST model with no local variables."""
+  keras_model = _create_keras3_model()
+  input_spec = _create_input_spec()
+  return ReconstructionModel.from_keras_model_and_layers(
+      keras_model=keras_model,
+      global_layers=keras_model.layers,
+      local_layers=[],
+      input_spec=input_spec,
+  )
+
+
 def local_recon_model_fn():
   """Keras MNIST model with final dense layer local."""
   keras_model = _create_keras_model()
+  input_spec = _create_input_spec()
+  return ReconstructionModel.from_keras_model_and_layers(
+      keras_model=keras_model,
+      global_layers=keras_model.layers[:-1],
+      local_layers=keras_model.layers[-1:],
+      input_spec=input_spec,
+  )
+
+
+def local_recon_model_fn_keras3():
+  """Keras MNIST model with final dense layer local."""
+  keras_model = _create_keras3_model()
   input_spec = _create_input_spec()
   return ReconstructionModel.from_keras_model_and_layers(
       keras_model=keras_model,
@@ -251,6 +311,8 @@ def _get_tff_optimizer(learning_rate=0.1):
 def _get_keras_optimizer_fn(learning_rate=0.1):
   return lambda: tf_keras.optimizers.SGD(learning_rate=learning_rate)
 
+def _get_keras3_optimizer_fn(learning_rate=0.1):
+  return lambda: keras.optimizers.SGD(learning_rate=learning_rate)
 
 class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
@@ -281,6 +343,36 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
           tf_keras.metrics.SparseCategoricalAccuracy(),
+      ]
+
+    learning_process = fed_recon.build_fed_recon(
+        local_recon_model_fn,
+        loss_fn=loss_fn,
+        metrics_fn=metrics_fn,
+        client_optimizer_fn=optimizer_fn(),
+    )
+
+    self.assertIsInstance(
+        learning_process, iterative_process_lib.IterativeProcess
+    )
+    federated_data_type = learning_process.next.type_signature.parameter[1]
+    self.assertEqual(
+        str(federated_data_type), '{<x=float32[?,784],y=int32[?,1]>*}@CLIENTS'
+    )
+
+  @parameterized.named_parameters([
+      ('keras3_opt', _get_keras3_optimizer_fn),
+      ('tff_opt', _get_tff_optimizer),
+  ])
+  def test_build_train_iterative_process_keras3(self, optimizer_fn):
+    def loss_fn():
+      return keras.losses.SparseCategoricalCrossentropy()
+
+    def metrics_fn():
+      return [
+          counters.Keras3NumExamplesCounter(),
+          counters.Keras3NumBatchesCounter(),
+          keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     learning_process = fed_recon.build_fed_recon(

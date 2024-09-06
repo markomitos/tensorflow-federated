@@ -21,6 +21,7 @@ from typing import Optional, Union
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import factory
 from tensorflow_federated.python.aggregators import mean
@@ -47,7 +48,7 @@ from tensorflow_federated.python.learning.templates import learning_process
 from tensorflow_federated.python.learning.templates import model_delta_client_work
 
 TFFOrKerasOptimizer = Union[
-    optimizer_base.Optimizer, tf_keras.optimizers.Optimizer
+    optimizer_base.Optimizer, tf_keras.optimizers.Optimizer, keras.optimizers.Optimizer
 ]
 
 
@@ -79,8 +80,8 @@ def build_scheduled_client_work(
       client work will call `optimizer_fn(learning_rate_fn(round_num))` where
       `round_num` is the integer round number.
     optimizer_fn: A callable accepting a float learning rate, and returning a
-      `tff.learning.optimizers.Optimizer` or a `tf_keras.Optimizer`. If
-      `model_fn` is a `FunctionalModel`, must be a
+      `tff.learning.optimizers.Optimizer`, `keras.Optimizer` or a `tf_keras.Optimizer`.
+      If `model_fn` is a `FunctionalModel`, must be a
       `tff.learning.optimizers.Optimizer`.
     metrics_aggregator: A function that takes in the metric finalizers (i.e.,
       `tff.learning.models.VariableModel.metric_finalizers()`) and a
@@ -205,6 +206,7 @@ def build_weighted_fed_avg_with_optimizer_schedule(
     server_optimizer_fn: Union[
         optimizer_base.Optimizer,
         Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer],
         None,
     ] = None,
     model_distributor: Optional[distributors.DistributionProcess] = None,
@@ -279,10 +281,11 @@ def build_weighted_fed_avg_with_optimizer_schedule(
       called on the resulting process. Also note that this function must be
       serializable by TFF.
     client_optimizer_fn: A callable accepting a float learning rate, and
-      returning a `tff.learning.optimizers.Optimizer` or a `tf_keras.Optimizer`.
+      returning a `tff.learning.optimizers.Optimizer`, `keras.Optimizer` or
+      a `tf_keras.Optimizer`.
     server_optimizer_fn: A `tff.learning.optimizers.Optimizer`, a no-arg
-      callable that returns a `tf_keras.Optimizer`, or None. By default, this
-      uses `tff.learning.optimizers.build_sgdm` with a learning rate of 1.0.
+      callable that returns a `tf_keras.Optimizer`, `keras.Optimizer`, or None.
+      By default, this uses `tff.learning.optimizers.build_sgdm` with a learning rate of 1.0.
     model_distributor: An optional `DistributionProcess` that distributes the
       model weights on the server to the clients. If set to `None`, the
       distributor is constructed via `distributors.build_broadcast_process`.

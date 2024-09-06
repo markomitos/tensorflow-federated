@@ -19,6 +19,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -110,6 +111,18 @@ def _create_p13n_fn_dict(learning_rate):
   p13n_fn_dict = collections.OrderedDict()
 
   opt_fn = lambda: tf_keras.optimizers.SGD(learning_rate=learning_rate)
+  # The two personalization strategies use different training batch sizes.
+  p13n_fn_dict['batch_size_1'] = lambda: _build_personalize_fn(opt_fn, 1, 3)
+  p13n_fn_dict['batch_size_2'] = lambda: _build_personalize_fn(opt_fn, 2, 3)
+
+  return p13n_fn_dict
+
+
+def _create_p13n_fn_dict_keras3(learning_rate):
+  """Creates a dictionary containing two personalization strategies."""
+  p13n_fn_dict = collections.OrderedDict()
+
+  opt_fn = lambda: keras.optimizers.SGD(learning_rate=learning_rate)
   # The two personalization strategies use different training batch sizes.
   p13n_fn_dict['batch_size_1'] = lambda: _build_personalize_fn(opt_fn, 1, 3)
   p13n_fn_dict['batch_size_2'] = lambda: _build_personalize_fn(opt_fn, 2, 3)

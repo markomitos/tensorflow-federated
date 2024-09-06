@@ -19,6 +19,7 @@ from typing import Any, Optional, Union
 
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
 from tensorflow_federated.python.core.impl.federated_context import federated_computation
@@ -165,7 +166,7 @@ def _build_keras_optimizer_initialize_and_next(
 
 def build_apply_optimizer_finalizer(
     optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer]
+        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer], Callable[[], keras.optimizers.Optimizer]
     ],
     model_weights_type: computation_types.StructType,
     should_reject_update: Callable[
@@ -215,6 +216,7 @@ def build_apply_optimizer_finalizer(
             tf_keras.optimizers.Optimizer,
             tf_keras.optimizers.legacy.Optimizer,
             tf_keras.optimizers.experimental.Optimizer,
+            keras.optimizers.Optimizer,
         ),
     ):
       raise TypeError(

@@ -46,6 +46,8 @@ typing-extensions>=4.5.0,==4.5.*
 tensorflow>=2.16.0,==2.16.*
 tf_keras>=2.16.0,==2.16.*
 
+keras @ git+https://github.com/keras-team/keras.git
+
 # TODO: b/315515548 - Required because current dependencies are pulling in later
 # versions which are causing opaque failures.
 googleapis-common-protos==1.61.0
