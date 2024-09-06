@@ -506,10 +506,7 @@ def functional_model_from_keras(
     with variable_utils.record_variable_creation_scope() as captured_variables:
       if isinstance(keras_model, (tf_keras.Model, keras.Model)):
         try:
-          if keras_compat.is_keras3(keras_model):
-            cloned_model = keras.models.clone_model(keras_model)
-          else:
-            cloned_model = tf_keras.models.clone_model(keras_model)
+          cloned_model = keras_compat.clone_model(keras_model)
         except RuntimeError as e:
           raise KerasFunctionalModelError(
               'Encountered a error converting the Keras model. Often this '
@@ -536,15 +533,12 @@ def functional_model_from_keras(
         return v.assign(p), p
 
       assign_ops, placeholders = zip(
-          *(assign_placeholder(v) for v in cloned_model.variables)
+          *(assign_placeholder(v) for v in keras_compat.get_variables(cloned_model.variables))
           )
 
     trainable_variables = tuple(
         v for v in captured_variables if keras_compat.get_variable(v) in keras_compat.get_variables(cloned_model.trainable_variables)
     )
-    # trainable_variables = tuple(
-    #     v for v in captured_variables if keras_compat.is_keras3(v) and v.value in cloned_model.trainable_variables or v in cloned_model.trainable_variables
-    # )
     non_trainable_variables = tuple(
         v
         for v in captured_variables
@@ -559,7 +553,6 @@ def functional_model_from_keras(
   else:
     model_for_variables = keras_model()
   current_model_weights = tf.nest.map_structure(
-    #lambda v: v.read_value().numpy() if hasattr(v, 'read_value') else v.value.numpy() if hasattr(v, 'value') else v.numpy(),
     lambda v: keras_compat.get_variable(v).numpy(),
     model_for_variables.variables
   )
@@ -654,7 +647,7 @@ def functional_model_from_keras(
 
 
 def keras_model_from_functional_weights(
-    *, model_weights: ModelWeights, keras_model: tf_keras.Model
+    *, model_weights: ModelWeights, keras_model: Union[tf_keras.Model, keras.Model]
 ) -> tf_keras.Model:
   """Creates a new Keras model using the model weights from a `FunctionalModel`.
 
@@ -711,74 +704,7 @@ def keras_model_from_functional_weights(
     return next_creator_fn(**kwargs)
 
   with tf.variable_creator_scope(variable_creator_with_weights):
-    new_model = tf_keras.models.clone_model(keras_model)
-  if trainable_weights or non_trainable_weights:
-    raise ValueError(
-        '`model_weights` contained more variables than `keras_model` uses, '
-        'check that the weights argument is matching the model type.'
-    )
-  return new_model
-
-
-def keras3_model_from_functional_weights(
-    *, model_weights: ModelWeights, keras_model: keras.Model
-) -> keras.Model:
-  """Creates a new Keras model using the model weights from a `FunctionalModel`.
-
-  This method is effectively the reverse of `functional_model_from_keras`. Since
-  the trained weights are external to the model, this method expects a nested
-  structure of tensors that was used to train a `FunctionalModel`
-
-  IMPORTANT: this method must be run in a graph context (e.g. inside a
-  `tf.Graph` context, or a `tff.tensorflow.computation` decorated callable),
-  otherwise the Keras model construction will differ from how the
-  `FunctionalModel` was originally created.
-
-  Args:
-    model_weights: A nested structure of tensors matching the structure of
-      `tff.learning.models.FunctionalModel.initial_weights` for a model
-      constructed using `functional_model_from_keras`.
-    keras_model: A Keras model to use for cloning a new model but with the input
-      weights.
-
-  Returns:
-    A newly constructed `keras.Model` that matches the architecture of
-    the input `keras_model` argument but with the weight values from
-    `model_weights.
-  """
-  if tf.compat.v1.executing_eagerly_outside_functions():
-    raise ValueError(
-        '`keras_model_from_functional_weights()` can only be called from within'
-        ' a graph context.'
-    )
-
-  # Convert to mutable lists that we can `pop` weights off of.
-  trainable_weights, non_trainable_weights = [list(w) for w in model_weights]
-
-  def variable_creator_with_weights(next_creator_fn, **kwargs):
-    try:
-      if kwargs.get('trainable', True):
-        weight = trainable_weights.pop(0)
-      else:
-        weight = non_trainable_weights.pop(0)
-    except IndexError:
-      raise ValueError(
-          '`model_weights` contains fewer weights than `keras_model` uses, '
-          'check that the weights argument is matching the model type.'
-      ) from None
-    if 'initial_value' in kwargs:
-      kwargs['initial_value'] = weight
-    elif 'initializer' in kwargs:
-      kwargs['initializer'] = tf.compat.v1.constant_initializer(value=weight)
-    else:
-      raise ValueError(
-          "Can't set weights to a Keras model that creates variables without "
-          'initial values.'
-      )
-    return next_creator_fn(**kwargs)
-
-  with tf.variable_creator_scope(variable_creator_with_weights):
-    new_model = keras.models.clone_model(keras_model)
+    new_model = keras_compat.clone_model(keras_model)
   if trainable_weights or non_trainable_weights:
     raise ValueError(
         '`model_weights` contained more variables than `keras_model` uses, '

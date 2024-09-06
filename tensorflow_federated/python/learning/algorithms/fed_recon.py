@@ -189,10 +189,8 @@ def _build_reconstruction_client_work(
     """
     with tf.init_scope():
       model = model_fn()
-      if keras_compat.is_keras3(model):
-        loss_metric = keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
-      else:
-        loss_metric = tf_keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
+      loss_metric = keras.metrics.MeanMetricWrapper(loss_fn(), name='loss') if keras_compat.is_keras3(model) \
+        else tf_keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
       if metrics_fn is None:
         metrics = [loss_metric]
       else:

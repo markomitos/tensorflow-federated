@@ -175,3 +175,23 @@ def get_variables(variables: Union[list, tuple]):
     otherwise returns the variables.
   """
   return [get_variable(var) for var in variables]
+
+
+def clone_model(model: Union[tf_keras.Model, keras.Model]):
+  """
+  Clones a tf_keras.Model or a keras.Model and returns the cloned model.
+
+  Args:
+    model: A tf_keras.Model or a keras.Model.
+
+  Returns:
+    An instance of `Model` reproducing the behavior
+    of the original model, on top of new inputs tensors,
+    using newly instantiated weights. The cloned model may behave
+    differently from the original model if a custom `clone_function`
+    or `call_function` modifies a layer or layer call.
+  """
+  if is_keras3(model):
+    return keras.models.clone_model(model)
+  else:
+    return tf_keras.models.clone_model(model)

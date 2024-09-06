@@ -188,12 +188,8 @@ def build_fed_recon_eval(
             client_model
         )
     )
-    is_keras3 = False
-    for variables in client_model.get_global_variables(client_model):
-      for v in variables:
-        if keras_compat.is_keras3(v):
-          is_keras3 = True
-          break
+    variables = client_model.get_global_variables(client_model)
+    is_keras3 = any(keras_compat.is_keras3(v) for variables in variables for v in variables)
     if is_keras3:
       loss_metric = keras.metrics.MeanMetricWrapper(loss_fn(), name='loss')
     else:

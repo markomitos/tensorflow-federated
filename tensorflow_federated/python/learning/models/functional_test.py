@@ -1079,8 +1079,6 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
         functional_model.initial_weights,
     )
 
-  #TODO figure out why inital weights are not assigned properly
-  @absl.testing.absltest.skip("Unusual behaviour from keras 3 initial weights assigning")
   def test_construct_from_keras3(self):
     keras_model = create_test_keras3_model()
     # Assign some variables after initialization so we can assert that they
@@ -1706,7 +1704,7 @@ class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
     # Now create a new keras model using the structure with model weights that
     # are all twos.
     with tf.Graph().as_default() as g:
-      new_model = functional.keras3_model_from_functional_weights(
+      new_model = functional.keras_model_from_functional_weights(
           model_weights=weights, keras_model=model
       )
       expected_variables = [
@@ -1756,7 +1754,7 @@ class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
     with self.assertRaisesRegex(
         ValueError, 'can only be called from within a graph context'
     ):
-      functional.keras3_model_from_functional_weights(
+      functional.keras_model_from_functional_weights(
           model_weights=weights, keras_model=model
       )
 
@@ -1788,7 +1786,7 @@ class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
     weights = (trainable_weights, non_trainable_weights)
     with tf.Graph().as_default():
       with self.assertRaisesRegex(ValueError, 'contains fewer weights'):
-        functional.keras3_model_from_functional_weights(
+        functional.keras_model_from_functional_weights(
             model_weights=weights, keras_model=model
         )
 
@@ -1828,7 +1826,7 @@ class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
     weights = (trainable_weights, non_trainable_weights)
     with tf.Graph().as_default():
       with self.assertRaisesRegex(ValueError, 'contained more variables'):
-        functional.keras3_model_from_functional_weights(
+        functional.keras_model_from_functional_weights(
             model_weights=weights, keras_model=model
         )
 
