@@ -103,7 +103,7 @@ def _build_tff_optimizer_initialize_and_next(
 
 def _build_keras_optimizer_initialize_and_next(
     model_weights_type: computation_types.Type,
-    optimizer_fn: Callable[[], tf_keras.optimizers.Optimizer],
+    optimizer_fn: Union [Callable[[], tf_keras.optimizers.Optimizer], Callable[[], keras.optimizers.Optimizer]],
     should_reject_update: Callable[
         [Any, Any], tuple[Union[bool, tf.Tensor], Optional[_MeasurementsType]]
     ],
@@ -188,8 +188,8 @@ def build_apply_optimizer_finalizer(
 
   Args:
     optimizer_fn: A `tff.learning.optimizers.Optimizer` or a no-arg function
-      that returns a `tf_keras.optimizers.Optimizer`. This optimizer is used to
-      apply client updates to the server model.
+      that returns a `tf_keras.optimizers.Optimizer` or a `keras.optimizers.Optimizer`.
+      This optimizer is used to apply client updates to the server model.
     model_weights_type: A non-federated `tff.Type` of the model weights to be
       optimized, which must have a `tff.learning.models.ModelWeights` container.
     should_reject_update: A callable that takes the optimizer state and the
@@ -221,7 +221,8 @@ def build_apply_optimizer_finalizer(
     ):
       raise TypeError(
           'The optimizer_fn must be a `tff.learning.optimizers.Optimizer`, or '
-          'a no-arg callable returning a `tf_keras.optimizers.Optimizer`. Got: '
+          'a no-arg callable returning a `tf_keras.optimizers.Optimizer` or a '
+          '`keras.optimizers.Optimizer`. Got: '
           f'{type(optimizer_fn)=}'
       )
 

@@ -26,6 +26,7 @@ from typing import Any, Optional, Union
 from absl import logging
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.common_libs import py_typecheck
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -383,7 +384,9 @@ def _choose_client_weight(weighting, has_non_finite_delta, num_examples):
 def build_model_delta_client_work(
     model_fn: Callable[[], variable.VariableModel],
     optimizer: Union[
-        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer]
+        optimizer_base.Optimizer,
+        Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer]
     ],
     client_weighting: client_weight_lib.ClientWeighting,
     delta_l2_regularizer: float,
@@ -566,7 +569,8 @@ def build_functional_model_delta_client_work(
   ):
     raise TypeError(
         'Provided optimizer must a either a tff.learning.optimizers.Optimizer '
-        'or a no-arg callable returning an tf_keras.optimizers.Optimizer.'
+        'or a no-arg callable returning an tf_keras.optimizers.Optimizer or'
+        'a keras.optimizers.Optimizer.'
     )
 
   if metrics_aggregator is None:

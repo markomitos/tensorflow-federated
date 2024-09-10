@@ -25,6 +25,7 @@ from typing import Any, Optional, Union
 
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.common_libs import py_typecheck
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -259,7 +260,9 @@ def _choose_client_weight(weighting, has_non_finite_delta, num_examples):
 def build_model_delta_client_work(
     model_fn: Callable[[], variable.VariableModel],
     optimizer: Union[
-        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer]
+        optimizer_base.Optimizer,
+        Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer]
     ],
     client_weighting: client_weight_lib.ClientWeighting,
     metrics_aggregator: Optional[types.MetricsAggregatorType] = None,
@@ -286,11 +289,11 @@ def build_model_delta_client_work(
       constructed entirely from scratch on each invocation, returning the same
       pre-constructed model each call will result in an error.
     optimizer: A `tff.learning.optimizers.Optimizer`, or a no-arg callable that
-      returns a `tf_keras.Optimizer`. If using a `tf_keras.Optimizer`, the
-      resulting process will have no hyperparameters in its state (ie.
-      `process.get_hparams` will return an empty dictionary), while if using a
-      `tff.learning.optimizers.Optimizer`, the process will have the same
-      hyperparameters as the optimizer.
+      returns a `tf_keras.Optimizer` or a `keras.Optimizer`. If using a
+      `tf_keras.Optimizer`, the resulting process will have no hyperparameters
+      in its state (ie. `process.get_hparams` will return an empty dictionary),
+      while if using a `tff.learning.optimizers.Optimizer`, the process will
+      have the same hyperparameters as the optimizer.
     client_weighting:  A `tff.learning.ClientWeighting` value.
     metrics_aggregator: A function that takes in the metric finalizers (i.e.,
       `tff.learning.models.VariableModel.metric_finalizers()`) returns a
