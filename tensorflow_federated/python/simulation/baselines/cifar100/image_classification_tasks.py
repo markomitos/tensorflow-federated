@@ -18,6 +18,7 @@ from typing import Optional, Union
 
 import tensorflow as tf
 import tf_keras
+import keras
 
 from tensorflow_federated.python.learning.models import keras_utils
 from tensorflow_federated.python.learning.models import variable
@@ -69,6 +70,38 @@ def _get_resnet_model(
     keras_model_fn = resnet_models.create_resnet101
   elif model_enum == ResnetModel.RESNET152:
     keras_model_fn = resnet_models.create_resnet152
+  else:
+    raise ValueError(
+        'The model id must be one of {}, found {}'.format(
+            _RESNET_MODELS, model_enum
+        )
+    )
+  return keras_model_fn(input_shape=input_shape, num_classes=_NUM_CLASSES)
+
+
+def _get_resnet_model_keras3(
+    model_id: Union[str, ResnetModel], input_shape: tuple[int, int, int]
+) -> keras.Model:
+  """Constructs a `keras.Model` for digit recognition."""
+  try:
+    model_enum = ResnetModel(model_id)
+  except ValueError as e:
+    raise ValueError(
+        'The model argument must be one of {}, found {}'.format(
+            ResnetModel, model_id
+        )
+    ) from e
+
+  if model_enum == ResnetModel.RESNET18:
+    keras_model_fn = resnet_models.create_resnet18_keras3
+  elif model_enum == ResnetModel.RESNET34:
+    keras_model_fn = resnet_models.create_resnet34_keras3
+  elif model_enum == ResnetModel.RESNET50:
+    keras_model_fn = resnet_models.create_resnet50_keras3
+  elif model_enum == ResnetModel.RESNET101:
+    keras_model_fn = resnet_models.create_resnet101_keras3
+  elif model_enum == ResnetModel.RESNET152:
+    keras_model_fn = resnet_models.create_resnet152_keras3
   else:
     raise ValueError(
         'The model id must be one of {}, found {}'.format(
@@ -155,6 +188,83 @@ def create_image_classification_task_with_datasets(
   return baseline_task.BaselineTask(task_datasets, model_fn)
 
 
+def create_image_classification_task_with_datasets_keras3(
+    train_client_spec: client_spec.ClientSpec,
+    eval_client_spec: Optional[client_spec.ClientSpec],
+    model_id: Union[str, ResnetModel],
+    crop_height: int,
+    crop_width: int,
+    distort_train_images: bool,
+    train_data: client_data.ClientData,
+    test_data: client_data.ClientData,
+) -> baseline_task.BaselineTask:
+  """Creates a baseline task for image classification on CIFAR-100.
+
+  Args:
+    train_client_spec: A `tff.simulation.baselines.ClientSpec` specifying how to
+      preprocess train client data.
+    eval_client_spec: An optional `tff.simulation.baselines.ClientSpec`
+      specifying how to preprocess evaluation client data. If set to `None`, the
+      evaluation datasets will use a batch size of 64 with no extra
+      preprocessing.
+    model_id: A string identifier for a digit recognition model. Must be one of
+      `resnet18`, `resnet34`, `resnet50`, `resnet101` and `resnet152. These
+      correspond to various ResNet architectures. Unlike standard ResNet
+      architectures though, the batch normalization layers are replaced with
+      group normalization.
+    crop_height: An integer specifying the desired height for cropping images.
+      Must be between 1 and 32 (the height of uncropped CIFAR-100 images). By
+      default, this is set to
+      `tff.simulation.baselines.cifar100.DEFAULT_CROP_HEIGHT`.
+    crop_width: An integer specifying the desired width for cropping images.
+      Must be between 1 and 32 (the width of uncropped CIFAR-100 images). By
+      default this is set to
+      `tff.simulation.baselines.cifar100.DEFAULT_CROP_WIDTH`.
+    distort_train_images: Whether to distort images in the train preprocessing
+      function.
+    train_data: A `tff.simulation.datasets.ClientData` used for training.
+    test_data: A `tff.simulation.datasets.ClientData` used for testing.
+
+  Returns:
+    A `tff.simulation.baselines.BaselineTask`.
+  """
+  if crop_height < 1 or crop_width < 1 or crop_height > 32 or crop_width > 32:
+    raise ValueError('The crop_height and crop_width must be between 1 and 32.')
+  crop_shape = (crop_height, crop_width, 3)
+
+  if eval_client_spec is None:
+    eval_client_spec = client_spec.ClientSpec(
+        num_epochs=1, batch_size=64, shuffle_buffer_size=1
+    )
+
+  train_preprocess_fn = image_classification_preprocessing.create_preprocess_fn(
+      train_client_spec,
+      crop_shape=crop_shape,
+      distort_image=distort_train_images,
+  )
+  eval_preprocess_fn = image_classification_preprocessing.create_preprocess_fn(
+      eval_client_spec, crop_shape=crop_shape
+  )
+
+  task_datasets = task_data.BaselineTaskDatasets(
+      train_data=train_data,
+      test_data=test_data,
+      validation_data=None,
+      train_preprocess_fn=train_preprocess_fn,
+      eval_preprocess_fn=eval_preprocess_fn,
+  )
+
+  def model_fn() -> variable.VariableModel:
+    return keras_utils.from_keras_model(
+        keras_model=_get_resnet_model_keras3(model_id, crop_shape),
+        loss=keras.losses.SparseCategoricalCrossentropy(),
+        input_spec=task_datasets.element_type_structure,
+        metrics=[keras.metrics.SparseCategoricalAccuracy()],
+    )
+
+  return baseline_task.BaselineTask(task_datasets, model_fn)
+
+
 def create_image_classification_task(
     train_client_spec: client_spec.ClientSpec,
     eval_client_spec: Optional[client_spec.ClientSpec] = None,
@@ -209,6 +319,71 @@ def create_image_classification_task(
     cifar_train, cifar_test = cifar100.load_data(cache_dir=cache_dir)
 
   return create_image_classification_task_with_datasets(
+      train_client_spec,
+      eval_client_spec,
+      model_id,
+      crop_height,
+      crop_width,
+      distort_train_images,
+      cifar_train,
+      cifar_test,
+  )
+
+
+def create_image_classification_task_keras3(
+    train_client_spec: client_spec.ClientSpec,
+    eval_client_spec: Optional[client_spec.ClientSpec] = None,
+    model_id: Union[str, ResnetModel] = 'resnet18',
+    crop_height: int = DEFAULT_CROP_HEIGHT,
+    crop_width: int = DEFAULT_CROP_WIDTH,
+    distort_train_images: bool = False,
+    cache_dir: Optional[str] = None,
+    use_synthetic_data: bool = False,
+) -> baseline_task.BaselineTask:
+  """Creates a baseline task for image classification on CIFAR-100.
+
+  The goal of the task is to minimize the sparse categorical crossentropy
+  between the output labels of the model and the true label of the image.
+
+  Args:
+    train_client_spec: A `tff.simulation.baselines.ClientSpec` specifying how to
+      preprocess train client data.
+    eval_client_spec: An optional `tff.simulation.baselines.ClientSpec`
+      specifying how to preprocess evaluation client data. If set to `None`, the
+      evaluation datasets will use a batch size of 64 with no extra
+      preprocessing.
+    model_id: A string identifier for a digit recognition model. Must be one of
+      `resnet18`, `resnet34`, `resnet50`, `resnet101` and `resnet152. These
+      correspond to various ResNet architectures. Unlike standard ResNet
+      architectures though, the batch normalization layers are replaced with
+      group normalization.
+    crop_height: An integer specifying the desired height for cropping images.
+      Must be between 1 and 32 (the height of uncropped CIFAR-100 images). By
+      default, this is set to
+      `tff.simulation.baselines.cifar100.DEFAULT_CROP_HEIGHT`.
+    crop_width: An integer specifying the desired width for cropping images.
+      Must be between 1 and 32 (the width of uncropped CIFAR-100 images). By
+      default this is set to
+      `tff.simulation.baselines.cifar100.DEFAULT_CROP_WIDTH`.
+    distort_train_images: Whether to distort images in the train preprocessing
+      function.
+    cache_dir: An optional directory to cache the downloadeded datasets. If
+      `None`, they will be cached to `~/.tff/`.
+    use_synthetic_data: A boolean indicating whether to use synthetic CIFAR-100
+      data. This option should only be used for testing purposes, in order to
+      avoid downloading the entire CIFAR-100 dataset.
+
+  Returns:
+    A `tff.simulation.baselines.BaselineTask`.
+  """
+  if use_synthetic_data:
+    synthetic_data = cifar100.get_synthetic()
+    cifar_train = synthetic_data
+    cifar_test = synthetic_data
+  else:
+    cifar_train, cifar_test = cifar100.load_data(cache_dir=cache_dir)
+
+  return create_image_classification_task_with_datasets_keras3(
       train_client_spec,
       eval_client_spec,
       model_id,

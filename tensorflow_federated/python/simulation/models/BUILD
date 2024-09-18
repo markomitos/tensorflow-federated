@@ -43,6 +43,7 @@ py_test(
 py_library(
     name = "resnet_models",
     srcs = ["resnet_models.py"],
+    deps = ["//tensorflow_federated/python/common_libs:keras_compat"],
 )
 
 py_test(

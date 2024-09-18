@@ -1568,7 +1568,7 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
         ),
     )
 
-  #TODO investiggate layer tracking furhter
+  #TODO DisableSharedObjectScope is no longer used in keras 3 while cloning the model, does it matter?
   @absl.testing.absltest.skip("Unusual behaviour from keras 3 layer tracking")
   def test_keras3_layer_input_other_layer_fails(self):
     # A variant of test_keras_layer_capturing_other_layer_fails, but
