@@ -42,7 +42,7 @@ tqdm~=4.64
 typing-extensions>=4.5.0,==4.5.*
 
 # The version of this dependency should match the version in
-# https://github.com/google-parfait/tensorflow-federated/blob/main/WORKSPACE.
+# WORKSPACE, project.toml and .devcontainer/post-create.sh
 tensorflow>=2.16.0,==2.16.*
 tf_keras>=2.16.0,==2.16.*
 

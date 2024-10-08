@@ -45,6 +45,8 @@ dependencies = [
   'portpicker~=1.6',
   'scipy~=1.9.3',
   'tensorflow-privacy==0.9.1a1',
+  # The version of this dependency should match the version in
+  # WORKSPACE, requirements.txt and .devcontainer/post-create.sh
   'tensorflow>=2.16.0,==2.16.*',
   'tf_keras>=2.16.0,==2.16.*',
   'tqdm~=4.64',

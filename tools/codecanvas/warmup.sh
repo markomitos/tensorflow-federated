@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 set -e
-exec 2>&1
-
-PROJECT_DIR=$(pwd)
-
-source .devcontainer/post-create.sh
 
 bazel_plugin=""
 if [ -d "/mnt/jetbrains/system/ide-plugins/clwb" ]; then
