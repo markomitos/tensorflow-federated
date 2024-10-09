@@ -37,10 +37,32 @@ class CreateResnetModelTest(tf.test.TestCase, parameterized.TestCase):
         num_classes=image_classification_tasks._NUM_CLASSES,
     )
 
+  @mock.patch.object(resnet_models, 'create_resnet18_keras3')
+  def test_get_resnet18_model_keras3(self, mock_model_builder):
+    input_shape = (32, 32, 3)
+    image_classification_tasks._get_resnet_model_keras3(
+        model_id='resnet18', input_shape=input_shape
+    )
+    mock_model_builder.assert_called_once_with(
+        input_shape=input_shape,
+        num_classes=image_classification_tasks._NUM_CLASSES,
+    )
+
   @mock.patch.object(resnet_models, 'create_resnet34')
   def test_get_resnet34_model(self, mock_model_builder):
     input_shape = (24, 24, 3)
     image_classification_tasks._get_resnet_model(
+        model_id='resnet34', input_shape=input_shape
+    )
+    mock_model_builder.assert_called_once_with(
+        input_shape=input_shape,
+        num_classes=image_classification_tasks._NUM_CLASSES,
+    )
+
+  @mock.patch.object(resnet_models, 'create_resnet34_keras3')
+  def test_get_resnet34_model_keras3(self, mock_model_builder):
+    input_shape = (24, 24, 3)
+    image_classification_tasks._get_resnet_model_keras3(
         model_id='resnet34', input_shape=input_shape
     )
     mock_model_builder.assert_called_once_with(
@@ -59,6 +81,18 @@ class CreateResnetModelTest(tf.test.TestCase, parameterized.TestCase):
         num_classes=image_classification_tasks._NUM_CLASSES,
     )
 
+  @mock.patch.object(resnet_models, 'create_resnet50_keras3')
+  def test_get_resnet50_model_keras3(self, mock_model_builder):
+    input_shape = (24, 1, 3)
+    image_classification_tasks._get_resnet_model_keras3(
+        model_id='resnet50', input_shape=input_shape
+    )
+    mock_model_builder.assert_called_once_with(
+        input_shape=input_shape,
+        num_classes=image_classification_tasks._NUM_CLASSES,
+    )
+
+
   @mock.patch.object(resnet_models, 'create_resnet101')
   def test_get_resnet101_model(self, mock_model_builder):
     input_shape = (1, 32, 3)
@@ -70,10 +104,32 @@ class CreateResnetModelTest(tf.test.TestCase, parameterized.TestCase):
         num_classes=image_classification_tasks._NUM_CLASSES,
     )
 
+  @mock.patch.object(resnet_models, 'create_resnet101_keras3')
+  def test_get_resnet101_model(self, mock_model_builder):
+    input_shape = (1, 32, 3)
+    image_classification_tasks._get_resnet_model_keras3(
+        model_id='resnet101', input_shape=input_shape
+    )
+    mock_model_builder.assert_called_once_with(
+        input_shape=input_shape,
+        num_classes=image_classification_tasks._NUM_CLASSES,
+    )
+
   @mock.patch.object(resnet_models, 'create_resnet152')
   def test_get_resnet152_model(self, mock_model_builder):
     input_shape = (2, 5, 3)
     image_classification_tasks._get_resnet_model(
+        model_id='resnet152', input_shape=input_shape
+    )
+    mock_model_builder.assert_called_once_with(
+        input_shape=input_shape,
+        num_classes=image_classification_tasks._NUM_CLASSES,
+    )
+
+  @mock.patch.object(resnet_models, 'create_resnet152_keras3')
+  def test_get_resnet152_model(self, mock_model_builder):
+    input_shape = (2, 5, 3)
+    image_classification_tasks._get_resnet_model_keras3(
         model_id='resnet152', input_shape=input_shape
     )
     mock_model_builder.assert_called_once_with(
@@ -101,12 +157,40 @@ class ImageClassificationTaskTest(tf.test.TestCase, parameterized.TestCase):
     )
     self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
 
+  def test_constructs_with_eval_client_spec_keras3(self):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
+    )
+    eval_client_spec = client_spec.ClientSpec(
+        num_epochs=1, batch_size=2, max_elements=5, shuffle_buffer_size=10
+    )
+    baseline_task_spec = (
+        image_classification_tasks.create_image_classification_task_keras3(
+            train_client_spec,
+            eval_client_spec=eval_client_spec,
+            model_id='resnet18',
+            use_synthetic_data=True,
+        )
+    )
+    self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
+
   def test_constructs_with_no_eval_client_spec(self):
     train_client_spec = client_spec.ClientSpec(
         num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
     )
     baseline_task_spec = (
         image_classification_tasks.create_image_classification_task(
+            train_client_spec, model_id='resnet18', use_synthetic_data=True
+        )
+    )
+    self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
+
+  def test_constructs_with_no_eval_client_spec_keras3(self):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
+    )
+    baseline_task_spec = (
+        image_classification_tasks.create_image_classification_task_keras3(
             train_client_spec, model_id='resnet18', use_synthetic_data=True
         )
     )
@@ -124,6 +208,27 @@ class ImageClassificationTaskTest(tf.test.TestCase, parameterized.TestCase):
     )
     baseline_task_spec = (
         image_classification_tasks.create_image_classification_task(
+            train_client_spec,
+            model_id='resnet18',
+            crop_height=crop_height,
+            crop_width=crop_width,
+            use_synthetic_data=True,
+        )
+    )
+    self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
+
+  @parameterized.named_parameters(
+      ('crop1', 32, 32),
+      ('crop2', 24, 24),
+      ('crop3', 32, 1),
+      ('crop4', 1, 32),
+  )
+  def test_constructs_with_different_crop_sizes_keras3(self, crop_height, crop_width):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
+    )
+    baseline_task_spec = (
+        image_classification_tasks.create_image_classification_task_keras3(
             train_client_spec,
             model_id='resnet18',
             crop_height=crop_height,
@@ -155,11 +260,51 @@ class ImageClassificationTaskTest(tf.test.TestCase, parameterized.TestCase):
           use_synthetic_data=True,
       )
 
+  @parameterized.named_parameters(
+      ('crop1', -20, 32),
+      ('crop2', 50, 24),
+      ('crop3', 24, -10),
+      ('crop4', 26, 35),
+      ('crop5', 33, 33),
+  )
+  def test_raises_on_bad_crop_sizes_keras3(self, crop_height, crop_width):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
+    )
+    with self.assertRaisesRegex(
+        ValueError, 'The crop_height and crop_width must be between 1 and 32.'
+    ):
+      image_classification_tasks.create_image_classification_task_keras3(
+          train_client_spec,
+          model_id='resnet18',
+          crop_height=crop_height,
+          crop_width=crop_width,
+          use_synthetic_data=True,
+      )
+
   def test_train_distortion_gives_nondeterministic_result(self):
     train_client_spec = client_spec.ClientSpec(
         num_epochs=1, batch_size=1, max_elements=1, shuffle_buffer_size=1
     )
     task = image_classification_tasks.create_image_classification_task(
+        train_client_spec,
+        model_id='resnet18',
+        distort_train_images=True,
+        use_synthetic_data=True,
+    )
+    train_preprocess_fn = task.datasets.train_preprocess_fn
+    dataset = task.datasets.train_data.create_tf_dataset_from_all_clients()
+    tf.random.set_seed(0)
+    example1 = next(iter(train_preprocess_fn(dataset)))
+    tf.random.set_seed(1)
+    example2 = next(iter(train_preprocess_fn(dataset)))
+    self.assertNotAllClose(example1, example2)
+
+  def test_train_distortion_gives_nondeterministic_result_keras3(self):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=1, batch_size=1, max_elements=1, shuffle_buffer_size=1
+    )
+    task = image_classification_tasks.create_image_classification_task_keras3(
         train_client_spec,
         model_id='resnet18',
         distort_train_images=True,
@@ -191,6 +336,24 @@ class ImageClassificationTaskTest(tf.test.TestCase, parameterized.TestCase):
     example2 = next(iter(train_preprocess_fn(dataset)))
     self.assertAllClose(example1, example2)
 
+  def test_no_train_distortion_gives_deterministic_result_keras3(self):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=1, batch_size=1, max_elements=1, shuffle_buffer_size=1
+    )
+    task = image_classification_tasks.create_image_classification_task_keras3(
+        train_client_spec,
+        model_id='resnet18',
+        distort_train_images=False,
+        use_synthetic_data=True,
+    )
+    train_preprocess_fn = task.datasets.train_preprocess_fn
+    dataset = task.datasets.train_data.create_tf_dataset_from_all_clients()
+    tf.random.set_seed(0)
+    example1 = next(iter(train_preprocess_fn(dataset)))
+    tf.random.set_seed(1)
+    example2 = next(iter(train_preprocess_fn(dataset)))
+    self.assertAllClose(example1, example2)
+
   @parameterized.named_parameters(
       ('resnet18', 'resnet18'),
       ('resnet34', 'resnet34'),
@@ -204,6 +367,28 @@ class ImageClassificationTaskTest(tf.test.TestCase, parameterized.TestCase):
     )
     baseline_task_spec = (
         image_classification_tasks.create_image_classification_task(
+            train_client_spec,
+            model_id=model_id,
+            crop_height=3,
+            crop_width=3,
+            use_synthetic_data=True,
+        )
+    )
+    self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
+
+  @parameterized.named_parameters(
+      ('resnet18', 'resnet18'),
+      ('resnet34', 'resnet34'),
+      ('resnet50', 'resnet50'),
+      ('resnet101', 'resnet101'),
+      ('resnet152', 'resnet152'),
+  )
+  def test_constructs_with_different_models_keras3(self, model_id):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
+    )
+    baseline_task_spec = (
+        image_classification_tasks.create_image_classification_task_keras3(
             train_client_spec,
             model_id=model_id,
             crop_height=3,

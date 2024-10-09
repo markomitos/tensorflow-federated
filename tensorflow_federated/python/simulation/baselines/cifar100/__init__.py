@@ -14,6 +14,7 @@
 """Libraries for constructing baseline tasks for the CIFAR-100 dataset."""
 
 from tensorflow_federated.python.simulation.baselines.cifar100.image_classification_tasks import create_image_classification_task
+from tensorflow_federated.python.simulation.baselines.cifar100.image_classification_tasks import create_image_classification_task_keras3
 from tensorflow_federated.python.simulation.baselines.cifar100.image_classification_tasks import DEFAULT_CROP_HEIGHT
 from tensorflow_federated.python.simulation.baselines.cifar100.image_classification_tasks import DEFAULT_CROP_WIDTH
 from tensorflow_federated.python.simulation.baselines.cifar100.image_classification_tasks import ResnetModel

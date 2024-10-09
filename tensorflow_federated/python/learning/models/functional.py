@@ -34,7 +34,6 @@ import keras
 import numpy as np
 import tensorflow as tf
 import tf_keras
-from keras.src.backend.common.variables import KerasVariable
 
 from tensorflow_federated.python.common_libs import py_typecheck, keras_compat
 from tensorflow_federated.python.learning.metrics import keras_finalizer

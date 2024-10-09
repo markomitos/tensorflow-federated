@@ -43,7 +43,7 @@ class ModelWeights(NamedTuple):
   @classmethod
   def from_model(cls, model):
     py_typecheck.check_type(model, (variable.VariableModel, tf_keras.Model, keras.Model))
-    return cls(model.trainable_variables, model.non_trainable_variables)
+    return cls(keras_compat.get_variables(model.trainable_variables), keras_compat.get_variables(model.non_trainable_variables))
 
   @classmethod
   def from_tff_result(cls, struct):
@@ -128,7 +128,7 @@ def weights_type_from_model(
   model_weights = ModelWeights.from_model(model)
 
   def _variable_to_type(x: tf.Variable) -> computation_types.Type:
-    return computation_types.tensorflow_to_type((x.dtype, x.shape))
+    return computation_types.tensorflow_to_type((keras_compat.keras_dtype_to_tf(x.dtype), x.shape))
 
   model_weights_type = tf.nest.map_structure(_variable_to_type, model_weights)
   # StructWithPythonType operates recursively, and will preserve the python type

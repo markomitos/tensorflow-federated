@@ -26,9 +26,24 @@ class ModelCollectionTest(tf.test.TestCase):
     self.assertIsNotNone(logits)
     self.assertEqual(logits.shape, [4, 10])
 
+  def test_conv_dropout_only_digits_shape_keras3(self):
+    image = tf.random.normal([4, 28, 28, 1])
+    model = emnist_models.create_conv_dropout_keras3_model(only_digits=True)
+    logits = model(image)
+    self.assertIsNotNone(logits)
+    self.assertEqual(logits.shape, [4, 10])
+
   def test_conv_dropout_shape(self):
     image = tf.random.normal([3, 28, 28, 1])
     model = emnist_models.create_conv_dropout_model(only_digits=False)
+    logits = model(image)
+
+    self.assertIsNotNone(logits)
+    self.assertEqual(logits.shape, [3, 62])
+
+  def test_conv_dropout_shape_keras3(self):
+    image = tf.random.normal([3, 28, 28, 1])
+    model = emnist_models.create_conv_dropout_keras3_model(only_digits=False)
     logits = model(image)
 
     self.assertIsNotNone(logits)
@@ -43,11 +58,28 @@ class ModelCollectionTest(tf.test.TestCase):
     self.assertIsNotNone(logits)
     self.assertEqual(logits.shape, [7, 62])
 
+  def test_2nn_output_shape_keras3(self):
+    image = tf.random.normal([7, 28, 28, 1])
+    model = emnist_models.create_two_hidden_layer_keras3_model(
+        only_digits=False, hidden_units=200
+    )
+    logits = model(image)
+    self.assertIsNotNone(logits)
+    self.assertEqual(logits.shape, [7, 62])
+
   def test_2nn_raises_on_nonpositive_hidden_units(self):
     with self.assertRaisesRegex(
         ValueError, 'hidden_units must be a positive integer'
     ):
       emnist_models.create_two_hidden_layer_model(
+          only_digits=True, hidden_units=0
+      )
+
+  def test_2nn_raises_on_nonpositive_hidden_units_keras3(self):
+    with self.assertRaisesRegex(
+        ValueError, 'hidden_units must be a positive integer'
+    ):
+      emnist_models.create_two_hidden_layer_keras3_model(
           only_digits=True, hidden_units=0
       )
 
@@ -63,9 +95,30 @@ class ModelCollectionTest(tf.test.TestCase):
     num_model_params = (28 * 28 + 1) * 200 + 201 * 200 + 201 * 10
     self.assertEqual(model.count_params(), num_model_params)
 
+  def test_2nn_number_of_parameters_keras3(self):
+    model = emnist_models.create_two_hidden_layer_keras3_model(
+        only_digits=True, hidden_units=200
+    )
+
+    # We calculate the number of parameters based on the fact that given densely
+    # connected layers of size n and m with bias units, there are (n+1)m
+    # parameters between these layers. The network above should have layers of
+    # size 28*28, 200, 200, and 10.
+    num_model_params = (28 * 28 + 1) * 200 + 201 * 200 + 201 * 10
+    self.assertEqual(model.count_params(), num_model_params)
+
   def test_autoencoder_model_shape(self):
     image = tf.random.normal([4, 28 * 28])
     model = emnist_models.create_autoencoder_model()
+    reconstructed_image = model(image)
+    num_model_params = 2837314
+    self.assertIsNotNone(reconstructed_image)
+    self.assertEqual(reconstructed_image.shape, [4, 28 * 28])
+    self.assertEqual(model.count_params(), num_model_params)
+
+  def test_autoencoder_keras3_model_shape(self):
+    image = tf.random.normal([4, 28 * 28])
+    model = emnist_models.create_autoencoder_keras3_model()
     reconstructed_image = model(image)
     num_model_params = 2837314
     self.assertIsNotNone(reconstructed_image)

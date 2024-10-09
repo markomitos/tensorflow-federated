@@ -195,3 +195,22 @@ def clone_model(model: Union[tf_keras.Model, keras.Model]):
     return keras.models.clone_model(model)
   else:
     return tf_keras.models.clone_model(model)
+
+
+def int_shape(x):
+  """Returns shape of tensor/variable as a tuple of int/None entries.
+
+  Args:
+      x: Tensor or variable.
+
+  Returns:
+      A tuple of integers (or None entries).
+
+  """
+  try:
+    shape = x.shape
+    if not isinstance(shape, tuple):
+      shape = tuple(shape.as_list())
+    return shape
+  except ValueError:
+    return None
