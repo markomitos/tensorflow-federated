@@ -17,6 +17,7 @@ import collections
 import random
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.learning.metrics import counters
 
@@ -30,16 +31,16 @@ def create_simple_keras_model(learning_rate=0.1):
   Returns:
     An instance of `tf.Keras.Model`.
   """
-  model = tf.keras.models.Sequential([
-      tf.keras.layers.Flatten(input_shape=(784,)),
-      tf.keras.layers.Dense(10, tf.nn.softmax, kernel_initializer='zeros'),
+  model = tf_keras.models.Sequential([
+      tf_keras.layers.Flatten(input_shape=(784,)),
+      tf_keras.layers.Dense(10, tf.nn.softmax, kernel_initializer='zeros'),
   ])
 
   model.compile(
-      loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-      optimizer=tf.keras.optimizers.SGD(learning_rate),
+      loss=tf_keras.losses.SparseCategoricalCrossentropy(),
+      optimizer=tf_keras.optimizers.SGD(learning_rate),
       metrics=[
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
           counters.NumExamplesCounter(),
       ],
   )
@@ -71,7 +72,7 @@ class _DeterministicInitializer:
 
   def __init__(
       self,
-      initializer_type: type[tf.keras.initializers.Initializer],
+      initializer_type: type[tf_keras.initializers.Initializer],
       base_seed: int,
   ):
     self._initializer_type = initializer_type
@@ -85,7 +86,7 @@ class _DeterministicInitializer:
 
 
 def create_keras_model(compile_model=False):
-  """Returns an instance of `tf.keras.Model` for use with the MNIST example.
+  """Returns an instance of `tf_keras.Model` for use with the MNIST example.
 
   This code is based on the following target, which unfortunately cannot be
   imported as it is a Python binary, not a library:
@@ -96,20 +97,20 @@ def create_keras_model(compile_model=False):
     compile_model: If True, compile the model with a basic optimizer and loss.
 
   Returns:
-    A `tf.keras.Model`.
+    A `tf_keras.Model`.
   """
   # TODO: b/120157713 - Find a way to import this code.
   data_format = 'channels_last'
   input_shape = [28, 28, 1]
   initializer = _DeterministicInitializer(
-      tf.keras.initializers.RandomNormal, base_seed=0
+      tf_keras.initializers.RandomNormal, base_seed=0
   )
-  max_pool = tf.keras.layers.MaxPooling2D(
+  max_pool = tf_keras.layers.MaxPooling2D(
       (2, 2), (2, 2), padding='same', data_format=data_format
   )
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape(target_shape=input_shape, input_shape=(28 * 28,)),
-      tf.keras.layers.Conv2D(
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape(target_shape=input_shape, input_shape=(28 * 28,)),
+      tf_keras.layers.Conv2D(
           32,
           5,
           padding='same',
@@ -118,7 +119,7 @@ def create_keras_model(compile_model=False):
           kernel_initializer=initializer(),
       ),
       max_pool,
-      tf.keras.layers.Conv2D(
+      tf_keras.layers.Conv2D(
           64,
           5,
           padding='same',
@@ -127,16 +128,16 @@ def create_keras_model(compile_model=False):
           kernel_initializer=initializer(),
       ),
       max_pool,
-      tf.keras.layers.Flatten(),
-      tf.keras.layers.Dense(
+      tf_keras.layers.Flatten(),
+      tf_keras.layers.Dense(
           1024, activation=tf.nn.relu, kernel_initializer=initializer()
       ),
-      tf.keras.layers.Dropout(0.4, seed=1),
-      tf.keras.layers.Dense(10, kernel_initializer=initializer()),
+      tf_keras.layers.Dropout(0.4, seed=1),
+      tf_keras.layers.Dense(10, kernel_initializer=initializer()),
   ])
   if compile_model:
     model.compile(
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-        optimizer=tf.keras.optimizers.SGD(learning_rate=0.1),
+        loss=tf_keras.losses.SparseCategoricalCrossentropy(),
+        optimizer=tf_keras.optimizers.SGD(learning_rate=0.1),
     )
   return model

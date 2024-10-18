@@ -19,6 +19,8 @@ import functools
 from typing import Union
 
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.learning.models import variable
 
@@ -162,10 +164,40 @@ def _dense_all_zeros_layer(input_dims=None, output_dim=1):
       one, effectively making the layer perform linear regression.
 
   Returns:
-    a `tf.keras.layers.Dense` object.
+    a `tf_keras.layers.Dense` object.
   """
   build_keras_dense_layer = functools.partial(
-      tf.keras.layers.Dense,
+      tf_keras.layers.Dense,
+      units=output_dim,
+      use_bias=True,
+      kernel_initializer='zeros',
+      bias_initializer='zeros',
+      activation=None,
+  )
+  if input_dims is not None:
+    return build_keras_dense_layer(input_shape=(input_dims,))
+  return build_keras_dense_layer()
+
+
+def _dense_all_zeros_layer_keras3(input_dims=None, output_dim=1):
+  """Create a layer that can be used in isolation for linear regression.
+
+  Constructs a Keras dense layer with a single output, using biases and weights
+  that are initialized to zero. No activation function is applied. When this is
+  the only layer in a model, the model is effectively a linear regression model.
+
+  Args:
+    input_dims: The integer length of the input to this layers. Maybe None if
+      the layer input size does not need to be specified.
+    output_dim: The integer length of the flattened output tensor. Defaults to
+      one, effectively making the layer perform linear regression.
+
+  Returns:
+    a `keras.layers.Dense` object.
+  """
+
+  build_keras_dense_layer = functools.partial(
+      keras.layers.Dense,
       units=output_dim,
       use_bias=True,
       kernel_initializer='zeros',
@@ -197,11 +229,49 @@ def _dense_all_zeros_regularized_layer(
       regularization on the layer's weights and bias.
 
   Returns:
-    a `tf.keras.layers.Dense` object.
+    a `tf_keras.layers.Dense` object.
   """
-  regularizer = tf.keras.regularizers.l2(regularization_constant)
+  regularizer = tf_keras.regularizers.l2(regularization_constant)
   build_keras_dense_layer = functools.partial(
-      tf.keras.layers.Dense,
+      tf_keras.layers.Dense,
+      units=output_dim,
+      use_bias=True,
+      kernel_initializer='zeros',
+      bias_initializer='zeros',
+      kernel_regularizer=regularizer,
+      bias_regularizer=regularizer,
+      activation=None,
+  )
+  if input_dims is not None:
+    return build_keras_dense_layer(input_shape=(input_dims,))
+  return build_keras_dense_layer()
+
+
+def _dense_all_zeros_regularized_layer_keras3(
+    input_dims=None, output_dim=1, regularization_constant=0.01
+):
+  """Create a layer that can be used in isolation for linear regression.
+
+  Constructs a Keras dense layer with a single output, using biases and weights
+  that are initialized to zero. No activation function is applied. When this is
+  the only layer in a model, the model is effectively a linear regression model.
+  The regularization constant is used to scale L2 regularization on the weights
+  and bias.
+
+  Args:
+    input_dims: The integer length of the input to this layers. Maybe None if
+      the layer input size does not need to be specified.
+    output_dim: The integer length of the flattened output tensor. Defaults to
+      one, effectively making the layer perform linear regression.
+    regularization_constant: The float scaling magnitude (lambda) for L2
+      regularization on the layer's weights and bias.
+
+  Returns:
+    a `keras.layers.Dense` object.
+  """
+  regularizer = keras.regularizers.l2(regularization_constant)
+  build_keras_dense_layer = functools.partial(
+      keras.layers.Dense,
       units=output_dim,
       use_bias=True,
       kernel_initializer='zeros',
@@ -235,11 +305,11 @@ def _dense_all_ones_regularized_layer(
       regularization on the layer's weights and bias.
 
   Returns:
-    a `tf.keras.layers.Dense` object.
+    a `tf_keras.layers.Dense` object.
   """
-  regularizer = tf.keras.regularizers.l2(regularization_constant)
+  regularizer = tf_keras.regularizers.l2(regularization_constant)
   build_keras_dense_layer = functools.partial(
-      tf.keras.layers.Dense,
+      tf_keras.layers.Dense,
       units=output_dim,
       use_bias=True,
       kernel_initializer='ones',
@@ -253,20 +323,79 @@ def _dense_all_ones_regularized_layer(
   return build_keras_dense_layer()
 
 
+def _dense_all_ones_regularized_layer_keras3(
+    input_dims=None, output_dim=1, regularization_constant=0.01
+):
+  """Create a layer that can be used in isolation for linear regression.
+
+  Constructs a Keras dense layer with a single output, using biases and weights
+  that are initialized to ones. No activation function is applied. When this is
+  the only layer in a model, the model is effectively a linear regression model.
+  The regularization constant is used to scale L2 regularization on the weights
+  and bias.
+
+  Args:
+    input_dims: The integer length of the input to this layers. Maybe None if
+      the layer input size does not need to be specified.
+    output_dim: The integer length of the flattened output tensor. Defaults to
+      one, effectively making the layer perform linear regression.
+    regularization_constant: The float scaling magnitude (lambda) for L2
+      regularization on the layer's weights and bias.
+
+  Returns:
+    a `tf_keras.layers.Dense` object.
+  """
+  regularizer = keras.regularizers.l2(regularization_constant)
+  build_keras_dense_layer = functools.partial(
+      keras.layers.Dense,
+      units=output_dim,
+      use_bias=True,
+      kernel_initializer='ones',
+      bias_initializer='ones',
+      kernel_regularizer=regularizer,
+      bias_regularizer=regularizer,
+      activation=None,
+  )
+
+  if input_dims is not None:
+    return build_keras_dense_layer(input_shape=(input_dims,))
+  return build_keras_dense_layer()
+
+
 def build_linear_regression_keras_sequential_model(feature_dims=2):
-  """Build a linear regression `tf.keras.Model` using the Sequential API."""
-  keras_model = tf.keras.models.Sequential()
-  keras_model.add(_dense_all_zeros_layer(feature_dims))
+  """Build a linear regression `tf_keras.Model` using the Sequential API."""
+  keras_model = tf_keras.models.Sequential()
+  keras_model.add(_dense_all_zeros_layer(input_dims=feature_dims))
+  return keras_model
+
+
+def build_linear_regression_keras3_sequential_model(feature_dims=2):
+  """Build a linear regression `keras.Model` using the Sequential API."""
+  keras_model = keras.models.Sequential()
+  keras_model.add(_dense_all_zeros_layer_keras3(input_dims=feature_dims))
   return keras_model
 
 
 def build_linear_regression_regularized_keras_sequential_model(
     feature_dims=2, regularization_constant=0.01
 ):
-  """Build a linear regression `tf.keras.Model` using the Sequential API."""
-  keras_model = tf.keras.models.Sequential()
+  """Build a linear regression `tf_keras.Model` using the Sequential API."""
+  keras_model = tf_keras.models.Sequential()
   keras_model.add(
       _dense_all_zeros_regularized_layer(
+          feature_dims, regularization_constant=regularization_constant
+      )
+  )
+  return keras_model
+
+
+def build_linear_regression_regularized_keras3_sequential_model(
+    feature_dims=2, regularization_constant=0.01
+):
+  """Build a linear regression `keras.Model` using the Sequential API."""
+  keras_model = keras.models.Sequential()
+  keras_model.add(
+      _dense_all_zeros_regularized_layer_keras3(
           feature_dims, regularization_constant=regularization_constant
       )
   )
@@ -276,8 +405,8 @@ def build_linear_regression_regularized_keras_sequential_model(
 def build_linear_regression_ones_regularized_keras_sequential_model(
     feature_dims=2, regularization_constant=0.01
 ):
-  """Build a linear regression `tf.keras.Model` using the Sequential API."""
-  keras_model = tf.keras.models.Sequential()
+  """Build a linear regression `tf_keras.Model` using the Sequential API."""
+  keras_model = tf_keras.models.Sequential()
   keras_model.add(
       _dense_all_ones_regularized_layer(
           feature_dims, regularization_constant=regularization_constant
@@ -286,18 +415,38 @@ def build_linear_regression_ones_regularized_keras_sequential_model(
   return keras_model
 
 
+def build_linear_regression_ones_regularized_keras3_sequential_model(
+    feature_dims=2, regularization_constant=0.01
+):
+  """Build a linear regression `keras.Model` using the Sequential API."""
+  keras_model = keras.models.Sequential()
+  keras_model.add(
+      _dense_all_ones_regularized_layer_keras3(
+          feature_dims, regularization_constant=regularization_constant
+      )
+  )
+  return keras_model
+
+
 def build_linear_regression_keras_functional_model(feature_dims=2):
-  """Build a linear regression `tf.keras.Model` using the functional API."""
-  a = tf.keras.layers.Input(shape=(feature_dims,), dtype=tf.float32)
+  """Build a linear regression `tf_keras.Model` using the functional API."""
+  a = tf_keras.layers.Input(shape=(feature_dims,), dtype=tf.float32)
   b = _dense_all_zeros_layer()(a)
-  return tf.keras.Model(inputs=a, outputs=b)
+  return tf_keras.Model(inputs=a, outputs=b)
+
+
+def build_linear_regression_keras3_functional_model(feature_dims=2):
+  """Build a linear regression `keras.Model` using the functional API."""
+  a = keras.layers.Input(shape=(feature_dims,), dtype=tf.float32)
+  b = _dense_all_zeros_layer_keras3(None)(a)
+  return keras.Model(inputs=[a], outputs=[b])
 
 
 def build_linear_regression_keras_subclass_model(feature_dims=2):
-  """Build a linear regression model by sub-classing `tf.keras.Model`."""
+  """Build a linear regression model by sub-classing `tf_keras.Model`."""
   del feature_dims  # Unused.
 
-  class _KerasLinearRegression(tf.keras.Model):
+  class _KerasLinearRegression(tf_keras.Model):
 
     def __init__(self):
       super().__init__()
@@ -312,9 +461,16 @@ def build_linear_regression_keras_subclass_model(feature_dims=2):
 
 def build_embedding_keras_model(vocab_size=10):
   """Builds a test model with an embedding initialized to one-hot vectors."""
-  keras_model = tf.keras.models.Sequential()
-  keras_model.add(tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=5))
-  keras_model.add(tf.keras.layers.Softmax())
+  keras_model = tf_keras.models.Sequential()
+  keras_model.add(tf_keras.layers.Embedding(input_dim=vocab_size, output_dim=5))
+  keras_model.add(tf_keras.layers.Softmax())
+  return keras_model
+
+def build_embedding_keras3_model(vocab_size=10):
+  """Builds a test model with an embedding initialized to one-hot vectors."""
+  keras_model = keras.models.Sequential()
+  keras_model.add(keras.layers.Embedding(input_dim=vocab_size, output_dim=5))
+  keras_model.add(keras.layers.Softmax())
   return keras_model
 
 
@@ -322,16 +478,16 @@ def build_conv_batch_norm_keras_model():
   """Builds a test model with convolution and batch normalization."""
   # This is an example of a model that has trainable and non-trainable
   # variables.
-  l = tf.keras.layers
+  l = tf_keras.layers
   data_format = 'channels_last'
   max_pool = l.MaxPooling2D(
-      (2, 2), (2, 2), padding='same', data_format=data_format
+      pool_size=(2, 2), strides=(2, 2), padding='same', data_format=data_format
   )
-  keras_model = tf.keras.models.Sequential([
+  keras_model = tf_keras.models.Sequential([
       l.Reshape(target_shape=[28, 28, 1], input_shape=(28 * 28,)),
       l.Conv2D(
-          32,
-          5,
+          filters=32,
+          kernel_size=5,
           padding='same',
           data_format=data_format,
           activation=tf.nn.relu,
@@ -341,8 +497,8 @@ def build_conv_batch_norm_keras_model():
       max_pool,
       l.BatchNormalization(),
       l.Conv2D(
-          64,
-          5,
+          filters=64,
+          kernel_size=5,
           padding='same',
           data_format=data_format,
           activation=tf.nn.relu,
@@ -353,12 +509,59 @@ def build_conv_batch_norm_keras_model():
       l.BatchNormalization(),
       l.Flatten(),
       l.Dense(
-          1024,
+          units=1024,
           activation=tf.nn.relu,
           kernel_initializer='zeros',
           bias_initializer='zeros',
       ),
-      l.Dropout(0.4),
+      l.Dropout(rate=0.4),
+      l.Dense(10, kernel_initializer='zeros', bias_initializer='zeros'),
+  ])
+  return keras_model
+
+
+def build_conv_batch_norm_keras3_model():
+  """Builds a test model with convolution and batch normalization."""
+  # This is an example of a model that has trainable and non-trainable
+  # variables.
+  l = keras.layers
+  data_format = 'channels_last'
+  max_pool = l.MaxPooling2D(
+      pool_size=(2, 2), strides=(2, 2), padding='same', data_format=data_format
+  )
+  keras_model = keras.models.Sequential([
+      l.Input(shape=(28 * 28,)),
+      l.Reshape(target_shape=[28, 28, 1]),
+      l.Conv2D(
+          filters=32,
+          kernel_size=5,
+          padding='same',
+          data_format=data_format,
+          activation='relu',
+          kernel_initializer='zeros',
+          bias_initializer='zeros',
+      ),
+      max_pool,
+      l.BatchNormalization(),
+      l.Conv2D(
+          filters=64,
+          kernel_size=5,
+          padding='same',
+          data_format=data_format,
+          activation='relu',
+          kernel_initializer='zeros',
+          bias_initializer='zeros',
+      ),
+      max_pool,
+      l.BatchNormalization(),
+      l.Flatten(),
+      l.Dense(
+          units=1024,
+          activation='relu',
+          kernel_initializer='zeros',
+          bias_initializer='zeros',
+      ),
+      l.Dropout(rate=0.4),
       l.Dense(10, kernel_initializer='zeros', bias_initializer='zeros'),
   ])
   return keras_model
@@ -366,23 +569,39 @@ def build_conv_batch_norm_keras_model():
 
 def build_multiple_inputs_keras_model():
   """Builds a test model with two inputs."""
-  l = tf.keras.layers
+  l = tf_keras.layers
   a = l.Input((1,), name='a')
   b = l.Input((1,), name='b')
   # Each input has a single, independent dense layer, which are combined into
   # a final dense layer.
-  output = l.Dense(1)(
+  output = l.Dense(units=1)(
       l.concatenate([
-          l.Dense(1)(a),
-          l.Dense(1)(b),
+          l.Dense(units=1)(a),
+          l.Dense(units=1)(b),
       ])
   )
-  return tf.keras.Model(inputs={'a': a, 'b': b}, outputs=[output])
+  return tf_keras.Model(inputs={'a': a, 'b': b}, outputs=[output])
+
+
+def build_multiple_inputs_keras3_model():
+  """Builds a test model with two inputs."""
+  l = keras.layers
+  a = l.Input((1,), name='a')
+  b = l.Input((1,), name='b')
+  # Each input has a single, independent dense layer, which are combined into
+  # a final dense layer.
+  output = l.Dense(units=1)(
+      l.concatenate([
+          l.Dense(units=1)(a),
+          l.Dense(units=1)(b),
+      ])
+  )
+  return keras.Model(inputs={'a': a, 'b': b}, outputs=[output])
 
 
 def build_multiple_outputs_keras_model():
   """Builds a test model with three outputs."""
-  l = tf.keras.layers
+  l = tf_keras.layers
   a = l.Input((1,))
   b = l.Input((1,))
 
@@ -390,19 +609,47 @@ def build_multiple_outputs_keras_model():
   output_b = l.Dense(1)(b)
   output_c = l.Dense(1)(l.concatenate([l.Dense(1)(a), l.Dense(1)(b)]))
 
-  return tf.keras.Model(inputs=[a, b], outputs=[output_a, output_b, output_c])
+  return tf_keras.Model(inputs=[a, b], outputs=[output_a, output_b, output_c])
+
+
+def build_multiple_outputs_keras3_model():
+  """Builds a test model with three outputs."""
+  l = keras.layers
+  a = l.Input((1,))
+  b = l.Input((1,))
+
+  output_a = l.Dense(1)(a)
+  output_b = l.Dense(1)(b)
+  output_c = l.Dense(1)(l.concatenate([l.Dense(1)(a), l.Dense(1)(b)]))
+
+  return keras.Model(inputs=[a, b], outputs=[output_a, output_b, output_c])
 
 
 def build_tupled_dict_outputs_keras_model():
   """Builds a test model with three outputs."""
-  l = tf.keras.layers
+  l = tf_keras.layers
   a = l.Input((1,))
   b = l.Input((1,))
 
   output_a = l.Dense(1)(a)
   output_b = l.Dense(1)(b)
 
-  return tf.keras.Model(
+  return tf_keras.Model(
+      inputs=[a, b],
+      outputs=({'output_1': output_a}, {'output_1': output_b}),
+  )
+
+
+def build_tupled_dict_outputs_keras3_model():
+  """Builds a test model with three outputs."""
+  l = keras.layers
+  a = l.Input((1,))
+  b = l.Input((1,))
+
+  output_a = l.Dense(1)(a)
+  output_b = l.Dense(1)(b)
+
+  return keras.Model(
       inputs=[a, b],
       outputs=({'output_1': output_a}, {'output_1': output_b}),
   )
@@ -420,26 +667,55 @@ def build_multiple_outputs_regularized_keras_model(
       biases.
 
   Returns:
-    a `tf.keras.Model` object.
+    a `tf_keras.Model` object.
   """
   dense = functools.partial(
       _dense_all_ones_regularized_layer,
       output_dim=1,
       regularization_constant=regularization_constant,
   )
-  a = tf.keras.layers.Input((1,))
-  b = tf.keras.layers.Input((1,))
+  a = tf_keras.layers.Input((1,))
+  b = tf_keras.layers.Input((1,))
 
   output_a = dense()(a)
   output_b = dense()(b)
-  output_c = dense()(tf.keras.layers.concatenate([dense()(a), dense()(b)]))
+  output_c = dense()(tf_keras.layers.concatenate([dense()(a), dense()(b)]))
 
-  return tf.keras.Model(inputs=[a, b], outputs=[output_a, output_b, output_c])
+  return tf_keras.Model(inputs=[a, b], outputs=[output_a, output_b, output_c])
+
+
+def build_multiple_outputs_regularized_keras3_model(
+    regularization_constant=0.01,
+):
+  """Builds a test model with three outputs.
+
+  All weights are initialized to ones.
+
+  Args:
+    regularization_constant: L2 scaling constant (lambda) for all weights and
+      biases.
+
+  Returns:
+    a `keras.Model` object.
+  """
+  dense = functools.partial(
+      _dense_all_ones_regularized_layer_keras3,
+      output_dim=1,
+      regularization_constant=regularization_constant
+  )
+  a = keras.layers.Input((1,))
+  b = keras.layers.Input((1,))
+
+  output_a = dense()(a)
+  output_b = dense()(b)
+  output_c = dense()(keras.layers.concatenate([dense()(a), dense()(b)]))
+
+  return keras.Model(inputs=[a, b], outputs=[output_a, output_b, output_c])
 
 
 def build_lookup_table_keras_model():
   """Builds a test model with embedding feature columns."""
-  l = tf.keras.layers
+  l = tf_keras.layers
   a = l.Input(shape=(1,), dtype=tf.string)
   # pylint: disable=g-deprecated-tf-checker
   embedded_lookup_feature = tf.feature_column.embedding_column(
@@ -451,24 +727,63 @@ def build_lookup_table_keras_model():
   # pylint: enable=g-deprecated-tf-checker
   dense_features = l.DenseFeatures([embedded_lookup_feature])({'colors': a})
   output = l.Dense(1)(dense_features)
-  return tf.keras.Model(inputs=[a], outputs=[output])
+  return tf_keras.Model(inputs=[a], outputs=[output])
+
+
+def build_lookup_table_keras3_model():
+    """Builds a test model with embedding feature columns."""
+
+    color_to_int_map = {'R': 0, 'G': 1, 'B': 2}
+
+    model = keras.models.Sequential()
+
+    model.add(keras.layers.StringLookup(
+        vocabulary=list(color_to_int_map.keys()), mask_token=None, num_oov_indices=0
+    ))
+
+    model.add(keras.layers.Embedding(input_dim=3, output_dim=16, input_length=1))
+    model.add(keras.layers.Flatten())
+
+    model.add(keras.layers.Dense(1))
+
+    return model
 
 
 def build_preprocessing_lookup_keras_model():
   """Builds a test model using processing layers."""
-  l = tf.keras.layers
+  l = tf_keras.layers
   a = l.Input(shape=(1,), dtype=tf.string)
   encoded = l.experimental.preprocessing.StringLookup(vocabulary=['A', 'B'])(a)
-  return tf.keras.Model(inputs=[a], outputs=[encoded])
+  return tf_keras.Model(inputs=[a], outputs=[encoded])
+
+
+def build_preprocessing_lookup_keras3_model():
+  """Builds a test model using processing layers."""
+  l = keras.layers
+  a = l.Input(shape=(1,), dtype=tf.string)
+  encoded = l.StringLookup(vocabulary=['A', 'B'])(a)
+  return tf_keras.Model(inputs=[a], outputs=[encoded])
 
 
 def build_ragged_tensor_input_keras_model():
   """Builds a test model with ragged tensors as input."""
-  return tf.keras.Sequential([
-      tf.keras.layers.Input(shape=[None], dtype=tf.int64, ragged=True),
-      tf.keras.layers.Embedding(1000, 16),
-      tf.keras.layers.LSTM(32, use_bias=False),
-      tf.keras.layers.Dense(32),
-      tf.keras.layers.Activation(tf.nn.relu),
-      tf.keras.layers.Dense(1),
+  return tf_keras.Sequential([
+      tf_keras.layers.Input(shape=[None], dtype=tf.int64, ragged=True),
+      tf_keras.layers.Embedding(1000, 16),
+      tf_keras.layers.LSTM(units=32, use_bias=False),
+      tf_keras.layers.Dense(units=32),
+      tf_keras.layers.Activation(activation=tf.nn.relu),
+      tf_keras.layers.Dense(units=1),
+  ])
+
+def build_ragged_tensor_input_keras3_model():
+  """Builds a test model with ragged tensors as input."""
+  return keras.Sequential([
+      keras.layers.Input(shape=[None], dtype=tf.int64),
+      keras.layers.Embedding(1000, 16, mask_zero=True),
+      keras.layers.Masking(),
+      keras.layers.LSTM(units=32, use_bias=False),
+      keras.layers.Dense(units=32),
+      keras.layers.Activation(activation=tf.nn.relu),
+      keras.layers.Dense(units=1),
   ])

@@ -32,19 +32,21 @@ dm-tree==0.1.8
 dp-accounting==0.4.3
 google-vizier==0.1.11
 grpcio~=1.46
-jaxlib==0.4.14
-jax==0.4.14
+jaxlib==0.4.18
+jax==0.4.18
 numpy~=1.25
 portpicker~=1.6
 scipy~=1.9.3
-tensorflow-model-optimization==0.7.5
-tensorflow-privacy==0.9.0
+tensorflow-privacy==0.9.1a1
 tqdm~=4.64
 typing-extensions>=4.5.0,==4.5.*
 
 # The version of this dependency should match the version in
-# https://github.com/google-parfait/tensorflow-federated/blob/main/WORKSPACE.
-tensorflow>=2.14.0,==2.14.*
+# WORKSPACE, project.toml and .devcontainer/post-create.sh
+tensorflow>=2.16.0,==2.16.*
+tf_keras>=2.16.0,==2.16.*
+
+keras @ git+https://github.com/keras-team/keras.git
 
 # TODO: b/315515548 - Required because current dependencies are pulling in later
 # versions which are causing opaque failures.

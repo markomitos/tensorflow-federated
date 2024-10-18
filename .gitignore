@@ -5,6 +5,7 @@
 *.py[cod]
 __pycache__/
 venv/
+*.egg-info/
 
 # Bazel
 /.bazelrc
@@ -13,3 +14,12 @@ venv/
 
 # Notebooks
 .ipynb_checkpoints
+
+# IntelliJ
+.idea
+.ijwb
+
+# Clangd
+.cache
+compile_commands.json
+external/

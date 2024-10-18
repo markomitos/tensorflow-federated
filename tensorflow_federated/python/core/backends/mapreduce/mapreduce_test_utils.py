@@ -17,6 +17,7 @@ import collections
 
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.mapreduce import forms
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -399,7 +400,7 @@ def get_mnist_training_example():
     )
     init_model = tf.compat.v1.global_variables_initializer()
 
-    optimizer = tf.keras.optimizers.SGD(state.learning_rate)
+    optimizer = tf_keras.optimizers.SGD(state.learning_rate)
 
     @tf.function
     def reduce_fn(loop_state, batch):

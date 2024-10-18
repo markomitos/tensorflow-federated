@@ -18,6 +18,8 @@ from unittest import mock
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -108,7 +110,19 @@ def _create_p13n_fn_dict(learning_rate):
   """Creates a dictionary containing two personalization strategies."""
   p13n_fn_dict = collections.OrderedDict()
 
-  opt_fn = lambda: tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  opt_fn = lambda: tf_keras.optimizers.SGD(learning_rate=learning_rate)
+  # The two personalization strategies use different training batch sizes.
+  p13n_fn_dict['batch_size_1'] = lambda: _build_personalize_fn(opt_fn, 1, 3)
+  p13n_fn_dict['batch_size_2'] = lambda: _build_personalize_fn(opt_fn, 2, 3)
+
+  return p13n_fn_dict
+
+
+def _create_p13n_fn_dict_keras3(learning_rate):
+  """Creates a dictionary containing two personalization strategies."""
+  p13n_fn_dict = collections.OrderedDict()
+
+  opt_fn = lambda: keras.optimizers.SGD(learning_rate=learning_rate)
   # The two personalization strategies use different training batch sizes.
   p13n_fn_dict['batch_size_1'] = lambda: _build_personalize_fn(opt_fn, 1, 3)
   p13n_fn_dict['batch_size_2'] = lambda: _build_personalize_fn(opt_fn, 2, 3)
@@ -304,13 +318,13 @@ class PersonalizationEvalTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_success_with_model_constructed_from_keras(self, input_spec):
     def model_fn():
-      inputs = tf.keras.Input(shape=(2,))  # feature dim = 2
-      outputs = tf.keras.layers.Dense(1)(inputs)
-      keras_model = tf.keras.Model(inputs=inputs, outputs=outputs)
+      inputs = tf_keras.Input(shape=(2,))  # feature dim = 2
+      outputs = tf_keras.layers.Dense(1)(inputs)
+      keras_model = tf_keras.Model(inputs=inputs, outputs=outputs)
       return keras_utils.from_keras_model(
           keras_model,
           input_spec=input_spec,
-          loss=tf.keras.losses.MeanSquaredError(),
+          loss=tf_keras.losses.MeanSquaredError(),
       )
 
     zero_model_weights = _create_zero_model_weights(model_fn)

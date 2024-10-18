@@ -19,6 +19,7 @@ import os
 
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.datasets import from_tensor_slices_client_data
 from tensorflow_federated.python.simulation.datasets import vision_datasets_utils as utils
@@ -222,14 +223,14 @@ def _generate_data_from_image_dir(
   """
   logger = logging.getLogger(LOGGER)
   logger.info('Start to download Fed iNatualist 2017 mapping files')
-  train_path = tf.keras.utils.get_file(
+  train_path = tf_keras.utils.get_file(
       INAT_TRAIN_SPLIT_FILE,
       origin=INAT_TRAIN_DOWNLOAD_URL,
       file_hash=INAT_TRAIN_SPLIT_FILE_MD5_CHECKSUM,
       hash_algorithm='md5',
       cache_dir=cache_dir,
   )
-  test_path = tf.keras.utils.get_file(
+  test_path = tf_keras.utils.get_file(
       INAT_TEST_SPLIT_FILE,
       origin=INAT_TEST_DOWNLOAD_URL,
       file_hash=INAT_TEST_SPLIT_FILE_MD5_CHECKSUM,
@@ -307,7 +308,7 @@ def load_data(
           '%s does not exist or is not a directory' % image_dir
       ) from e
     logger.info('Start to download the images for the training set.')
-    tf.keras.utils.get_file(
+    tf_keras.utils.get_file(
         'train_val_images.tar.gz',
         origin=INAT_TRAIN_IMAGE_URL,
         file_hash=INAT_TRAIN_IMAGE_MD5_CHECKSUM,
@@ -317,7 +318,7 @@ def load_data(
     )
     logger.info('Finish to download the images for the training set.')
     logger.info('Start to download the images for the testing set.')
-    tf.keras.utils.get_file(
+    tf_keras.utils.get_file(
         'test2017.tar.gz',
         origin=INAT_TEST_IMAGE_URL,
         file_hash=INAT_TEST_IMAGE_MD5_CHECKSUM,

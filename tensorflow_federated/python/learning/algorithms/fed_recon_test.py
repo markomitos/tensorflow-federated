@@ -22,6 +22,8 @@ import attrs
 import numpy as np
 import tensorflow as tf
 import tensorflow_privacy as tfp
+import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import differential_privacy
 from tensorflow_federated.python.aggregators import factory
@@ -58,13 +60,13 @@ def _create_input_spec():
 
 
 def _create_keras_model():
-  initializer = tf.keras.initializers.RandomNormal(seed=0)
-  max_pool = tf.keras.layers.MaxPooling2D(
+  initializer = tf_keras.initializers.RandomNormal(seed=0)
+  max_pool = tf_keras.layers.MaxPooling2D(
       (2, 2), (2, 2), padding='same', data_format='channels_last'
   )
-  model = tf.keras.Sequential([
-      tf.keras.layers.Reshape(target_shape=[28, 28, 1], input_shape=(28 * 28,)),
-      tf.keras.layers.Conv2D(
+  model = tf_keras.Sequential([
+      tf_keras.layers.Reshape(target_shape=[28, 28, 1], input_shape=(28 * 28,)),
+      tf_keras.layers.Conv2D(
           32,
           5,
           padding='same',
@@ -73,7 +75,7 @@ def _create_keras_model():
           kernel_initializer=initializer,
       ),
       max_pool,
-      tf.keras.layers.Conv2D(
+      tf_keras.layers.Conv2D(
           64,
           5,
           padding='same',
@@ -82,12 +84,47 @@ def _create_keras_model():
           kernel_initializer=initializer,
       ),
       max_pool,
-      tf.keras.layers.Flatten(),
-      tf.keras.layers.Dense(
+      tf_keras.layers.Flatten(),
+      tf_keras.layers.Dense(
           1024, activation=tf.nn.relu, kernel_initializer=initializer
       ),
-      tf.keras.layers.Dropout(0.4, seed=1),
-      tf.keras.layers.Dense(10, kernel_initializer=initializer),
+      tf_keras.layers.Dropout(0.4, seed=1),
+      tf_keras.layers.Dense(10, kernel_initializer=initializer),
+  ])
+  return model
+
+
+def _create_keras3_model():
+  initializer =keras.initializers.RandomNormal(seed=0)
+  max_pool = keras.layers.MaxPooling2D(
+      (2, 2), (2, 2), padding='same', data_format='channels_last'
+  )
+  model = keras.Sequential([
+      keras.layers.Reshape(target_shape=[28, 28, 1], input_shape=(28 * 28,)),
+      keras.layers.Conv2D(
+          32,
+          5,
+          padding='same',
+          data_format='channels_last',
+          activation=tf.nn.relu,
+          kernel_initializer=initializer,
+      ),
+      max_pool,
+      keras.layers.Conv2D(
+          64,
+          5,
+          padding='same',
+          data_format='channels_last',
+          activation=tf.nn.relu,
+          kernel_initializer=initializer,
+      ),
+      max_pool,
+      keras.layers.Flatten(),
+      keras.layers.Dense(
+          1024, activation=tf.nn.relu, kernel_initializer=initializer
+      ),
+      keras.layers.Dropout(0.4, seed=1),
+      keras.layers.Dense(10, kernel_initializer=initializer),
   ])
   return model
 
@@ -104,9 +141,33 @@ def global_recon_model_fn():
   )
 
 
+def global_recon_model_fn_keras3():
+  """Keras MNIST model with no local variables."""
+  keras_model = _create_keras3_model()
+  input_spec = _create_input_spec()
+  return ReconstructionModel.from_keras_model_and_layers(
+      keras_model=keras_model,
+      global_layers=keras_model.layers,
+      local_layers=[],
+      input_spec=input_spec,
+  )
+
+
 def local_recon_model_fn():
   """Keras MNIST model with final dense layer local."""
   keras_model = _create_keras_model()
+  input_spec = _create_input_spec()
+  return ReconstructionModel.from_keras_model_and_layers(
+      keras_model=keras_model,
+      global_layers=keras_model.layers[:-1],
+      local_layers=keras_model.layers[-1:],
+      input_spec=input_spec,
+  )
+
+
+def local_recon_model_fn_keras3():
+  """Keras MNIST model with final dense layer local."""
+  keras_model = _create_keras3_model()
   input_spec = _create_input_spec()
   return ReconstructionModel.from_keras_model_and_layers(
       keras_model=keras_model,
@@ -248,8 +309,10 @@ def _get_tff_optimizer(learning_rate=0.1):
 
 
 def _get_keras_optimizer_fn(learning_rate=0.1):
-  return lambda: tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  return lambda: tf_keras.optimizers.SGD(learning_rate=learning_rate)
 
+def _get_keras3_optimizer_fn(learning_rate=0.1):
+  return lambda: keras.optimizers.SGD(learning_rate=learning_rate)
 
 class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
@@ -273,13 +336,43 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
   ])
   def test_build_train_iterative_process(self, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
+      ]
+
+    learning_process = fed_recon.build_fed_recon(
+        local_recon_model_fn,
+        loss_fn=loss_fn,
+        metrics_fn=metrics_fn,
+        client_optimizer_fn=optimizer_fn(),
+    )
+
+    self.assertIsInstance(
+        learning_process, iterative_process_lib.IterativeProcess
+    )
+    federated_data_type = learning_process.next.type_signature.parameter[1]
+    self.assertEqual(
+        str(federated_data_type), '{<x=float32[?,784],y=int32[?,1]>*}@CLIENTS'
+    )
+
+  @parameterized.named_parameters([
+      ('keras3_opt', _get_keras3_optimizer_fn),
+      ('tff_opt', _get_tff_optimizer),
+  ])
+  def test_build_train_iterative_process_keras3(self, optimizer_fn):
+    def loss_fn():
+      return keras.losses.SparseCategoricalCrossentropy()
+
+    def metrics_fn():
+      return [
+          counters.Keras3NumExamplesCounter(),
+          counters.Keras3NumBatchesCounter(),
+          keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     learning_process = fed_recon.build_fed_recon(
@@ -307,7 +400,7 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
     learning_process = fed_recon.build_fed_recon(
         local_recon_model_fn,
-        loss_fn=tf.keras.losses.SparseCategoricalCrossentropy,
+        loss_fn=tf_keras.losses.SparseCategoricalCrossentropy,
         client_optimizer_fn=_get_tff_optimizer(0.0001),
         reconstruction_optimizer_fn=_get_tff_optimizer(0.001),
         client_weighting=client_weight_fn,
@@ -326,7 +419,7 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
     learning_process = fed_recon.build_fed_recon(
         local_recon_model_fn,
-        loss_fn=tf.keras.losses.SparseCategoricalCrossentropy,
+        loss_fn=tf_keras.losses.SparseCategoricalCrossentropy,
         client_optimizer_fn=_get_keras_optimizer_fn(0.001),
         reconstruction_optimizer_fn=_get_keras_optimizer_fn(0.001),
         client_weighting=client_weight_fn,
@@ -352,13 +445,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
   ])
   def test_keras_global_model(self, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     learning_process = fed_recon.build_fed_recon(
@@ -418,13 +511,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
     self.skipTest('b/201413656')
 
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     learning_process = fed_recon.build_fed_recon(
@@ -486,13 +579,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_keras_local_layer_client_weighting_enum_num_examples(self):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     learning_process = fed_recon.build_fed_recon(
@@ -537,13 +630,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_keras_local_layer_client_weighting_enum_uniform(self):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     learning_process = fed_recon.build_fed_recon(
@@ -587,7 +680,7 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_keras_local_layer_metrics_empty_list(self):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return []
@@ -621,7 +714,7 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_keras_local_layer_metrics_none(self):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     learning_process = fed_recon.build_fed_recon(
         local_recon_model_fn,
@@ -657,13 +750,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
     train_data = [client_data(), client_data()]
 
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     # Disable reconstruction via 0 learning rate to ensure post-recon loss
@@ -720,13 +813,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
     train_data = [client_data(), client_data()]
 
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     # Disable reconstruction via 0 learning rate to ensure post-recon loss
@@ -736,7 +829,7 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
         loss_fn=loss_fn,
         metrics_fn=metrics_fn,
         server_optimizer_fn=functools.partial(
-            tf.keras.optimizers.Adagrad, 0.01
+            tf_keras.optimizers.Adagrad, 0.01
         ),
         client_optimizer_fn=optimizer_fn(0.001),
         reconstruction_optimizer_fn=optimizer_fn(0.0),
@@ -781,13 +874,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
     train_data = [client_data(), client_data()]
 
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     # No values should be clipped and zeroed
@@ -843,13 +936,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_iterative_process_fails_with_dp_agg_and_client_weight_fn(self):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     # No values should be changed, but working with inf directly zeroes out all
@@ -881,13 +974,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_iterative_process_fails_with_dp_agg_and_none_client_weighting(self):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     # No values should be changed, but working with inf directly zeroes out all
@@ -918,13 +1011,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
     train_data = [client_data(), client_data()]
 
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     # No values should be changed, but working with inf directly zeroes out all
@@ -986,13 +1079,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
   def test_keras_local_layer_custom_broadcaster(self):
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     model_weights_type = reconstruction_model.global_weights_type_from_model(
@@ -1075,13 +1168,13 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
     train_data = [client_data(), client_data()]
 
     def loss_fn():
-      return tf.keras.losses.SparseCategoricalCrossentropy()
+      return tf_keras.losses.SparseCategoricalCrossentropy()
 
     def metrics_fn():
       return [
           counters.NumExamplesCounter(),
           counters.NumBatchesCounter(),
-          tf.keras.metrics.SparseCategoricalAccuracy(),
+          tf_keras.metrics.SparseCategoricalAccuracy(),
       ]
 
     dataset_split_fn = ReconstructionModel.build_dataset_split_fn(
@@ -1126,7 +1219,7 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
 
     learning_process = fed_recon.build_fed_recon(
         local_recon_model_fn,
-        loss_fn=tf.keras.losses.SparseCategoricalCrossentropy,
+        loss_fn=tf_keras.losses.SparseCategoricalCrossentropy,
         client_optimizer_fn=_get_keras_optimizer_fn(0.001),
         reconstruction_optimizer_fn=_get_keras_optimizer_fn(0.001),
     )
@@ -1158,7 +1251,7 @@ class TrainingProcessTest(tf.test.TestCase, parameterized.TestCase):
     mock_model_fn = mock.Mock(side_effect=local_recon_model_fn)
     fed_recon.build_fed_recon(
         model_fn=mock_model_fn,
-        loss_fn=tf.keras.losses.SparseCategoricalCrossentropy,
+        loss_fn=tf_keras.losses.SparseCategoricalCrossentropy,
         client_optimizer_fn=_get_keras_optimizer_fn(),
     )
     # TODO: b/186451541 - Reduce the number of calls to model_fn.

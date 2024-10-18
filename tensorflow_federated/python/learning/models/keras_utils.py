@@ -20,8 +20,9 @@ import warnings
 
 from absl import logging
 import tensorflow as tf
+import tf_keras
 
-from tensorflow_federated.python.common_libs import py_typecheck
+from tensorflow_federated.python.common_libs import py_typecheck, keras_compat
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
 from tensorflow_federated.python.core.impl.federated_context import intrinsics
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -30,31 +31,35 @@ from tensorflow_federated.python.core.impl.types import type_conversions
 from tensorflow_federated.python.learning.metrics import counters
 from tensorflow_federated.python.learning.metrics import keras_finalizer
 from tensorflow_federated.python.learning.models import variable
+import keras
 
-Loss = Union[tf.keras.losses.Loss, list[tf.keras.losses.Loss]]
+Loss = Union[tf_keras.losses.Loss, list[tf_keras.losses.Loss], keras.losses.Loss, list[keras.losses.Loss]]
+Model = Union[tf_keras.Model, keras.Model]
 
 
 # TODO: b/197746608 - Remove the code path that takes in constructed Keras
 # metrics, because reconstructing metrics via `from_config` can cause problems.
 def from_keras_model(
-    keras_model: tf.keras.Model,
+    keras_model: Model,
     loss: Loss,
     input_spec,
     loss_weights: Optional[list[float]] = None,
     metrics: Optional[
         Union[
-            list[tf.keras.metrics.Metric],
-            list[Callable[[], tf.keras.metrics.Metric]],
+            list[tf_keras.metrics.Metric],
+            list[Callable[[], tf_keras.metrics.Metric]],
+            list[keras.metrics.Metric],
+            list[Callable[[], keras.metrics.Metric]],
         ]
     ] = None,
 ) -> variable.VariableModel:
-  """Builds a `tff.learning.models.VariableModel` from a `tf.keras.Model`.
+  """Builds a `tff.learning.models.VariableModel` from a `tf_keras.Model`.
 
   The `tff.learning.models.VariableModel` returned by this function uses `keras_model` for
   its forward pass and autodifferentiation steps. The returned model will have
   three additional metrics including: loss, num_examples, and num_batches.
 
-  Notice that since TFF couples the `tf.keras.Model` and `loss`,
+  Notice that since TFF couples the `tf_keras.Model` and `loss`,
   TFF needs a slightly different notion of "fully specified type" than
   pure Keras does. That is, the model `M` takes inputs of type `x` and
   produces predictions of type `p`; the loss function `L` takes inputs of type
@@ -63,19 +68,19 @@ def from_keras_model(
   which the generated `tff.learning.models.VariableModel` will appear, TFF needs the type `y`
   in addition to the type `x`.
 
-  Note: This function does not currently accept subclassed `tf.keras.Models`,
+  Note: This function does not currently accept subclassed `tf_keras.Models`,
   as it makes assumptions about presence of certain attributes which are
   guaranteed to exist through the functional or Sequential API but are
   not necessarily present for subclassed models.
 
-  Note: This function raises a UserWarning if the `tf.keras.Model` contains a
+  Note: This function raises a UserWarning if the `tf_keras.Model` contains a
   BatchNormalization layer, as the batch mean and variance will be treated as
   non-trainable variables and won't be updated during the training (see
   b/186845846 for more information). Consider using Group Normalization instead.
 
   Args:
-    keras_model: A `tf.keras.Model` object that is not compiled.
-    loss: A single `tf.keras.losses.Loss` or a list of losses-per-output. If a
+    keras_model: A `tf_keras.Model` object that is not compiled.
+    loss: A single `tf_keras.losses.Loss` or a list of losses-per-output. If a
       single loss is provided, then all model output (as well as all prediction
       information) is passed to the loss; this includes situations of multiple
       model outputs and/or predictions. If multiple losses are provided as a
@@ -93,8 +98,8 @@ def from_keras_model(
     loss_weights: (Optional) A list of Python floats used to weight the loss
       contribution of each model output (when providing a list of losses for the
       `loss` argument).
-    metrics: (Optional) a list of `tf.keras.metrics.Metric` objects or a list of
-      no-arg callables that each constructs a `tf.keras.metrics.Metric`. Note:
+    metrics: (Optional) a list of `tf_keras.metrics.Metric` objects or a list of
+      no-arg callables that each constructs a `tf_keras.metrics.Metric`. Note:
       if metrics with names `num_examples` or `num_batches` are found, they will
       be used as-is. If they are not found in the `metrics` argument list, they
       will be added by default using `tff.learning.metrics.NumExamplesCounter`
@@ -104,12 +109,12 @@ def from_keras_model(
     A `tff.learning.models.VariableModel` object.
 
   Raises:
-    TypeError: If `keras_model` is not an instance of `tf.keras.Model`, if
-      `loss` is not an instance of `tf.keras.losses.Loss` nor a list of
-      instances of `tf.keras.losses.Loss`, if `input_spec` is a `tff.Type` but
+    TypeError: If `keras_model` is not an instance of `tf_keras.Model`, if
+      `loss` is not an instance of `tf_keras.losses.Loss` nor a list of
+      instances of `tf_keras.losses.Loss`, if `input_spec` is a `tff.Type` but
       the leaf nodes are not `tff.TensorType`s, if `loss_weight` is provided but
       is not a list of floats, or if `metrics` is provided but is not a list of
-      instances of `tf.keras.metrics.Metric`.
+      instances of `tf_keras.metrics.Metric`.
     ValueError: If `keras_model` was compiled, if `loss` is a list of unequal
       length to the number of outputs of `keras_model`, if `loss_weights` is
       specified but `loss` is not a list, if `input_spec` does not contain
@@ -117,13 +122,13 @@ def from_keras_model(
       contain keys `'x'` and `'y'`.
   """.format(variable.MODEL_ARG_NAME, variable.MODEL_LABEL_NAME)
   # Validate `keras_model`
-  py_typecheck.check_type(keras_model, tf.keras.Model)
-  if keras_model._is_compiled:  # pylint: disable=protected-access
+  py_typecheck.check_type(keras_model, (keras.Model, tf_keras.Model))
+  if keras_compat.is_compiled(keras_model): #keras_model._is_compiled:  # pylint: disable=protected-access
     raise ValueError('`keras_model` must not be compiled')
 
   # Validate and normalize `loss` and `loss_weights`
   if not isinstance(loss, list):
-    py_typecheck.check_type(loss, tf.keras.losses.Loss)
+    py_typecheck.check_type(loss, (tf_keras.losses.Loss, keras.losses.Loss))
     if loss_weights is not None:
       raise ValueError('`loss_weights` cannot be used if `loss` is not a list.')
     loss = [loss]
@@ -138,7 +143,7 @@ def from_keras_model(
           )
       )
     for loss_fn in loss:
-      py_typecheck.check_type(loss_fn, tf.keras.losses.Loss)
+      py_typecheck.check_type(loss_fn, (tf_keras.losses.Loss, keras.losses.Loss))
 
     if loss_weights is None:
       loss_weights = [1.0] * len(loss)
@@ -197,7 +202,7 @@ def from_keras_model(
     py_typecheck.check_type(metrics, list)
 
   for layer in keras_model.layers:
-    if isinstance(layer, tf.keras.layers.BatchNormalization):
+    if isinstance(layer, (tf_keras.layers.BatchNormalization, keras.layers.BatchNormalization)):
       warnings.warn(
           (
               "Batch Normalization contains non-trainable variables that won't"
@@ -219,19 +224,19 @@ def from_keras_model(
 
 def federated_aggregate_keras_metric(
     metrics: Union[
-        tf.keras.metrics.Metric,
-        Sequence[tf.keras.metrics.Metric],
-        Callable[[], tf.keras.metrics.Metric],
-        Sequence[Callable[[], tf.keras.metrics.Metric]],
+        tf_keras.metrics.Metric,
+        Sequence[tf_keras.metrics.Metric],
+        Callable[[], tf_keras.metrics.Metric],
+        Sequence[Callable[[], tf_keras.metrics.Metric]],
     ],
     federated_values,
 ):
   """Aggregates variables a keras metric placed at CLIENTS to SERVER.
 
   Args:
-    metrics: A single or a `Sequence` of `tf.keras.metrics.Metric` objects, or a
+    metrics: A single or a `Sequence` of `tf_keras.metrics.Metric` objects, or a
       single or a `Sequence` of no-arg callables that each constructs a
-      `tf.keras.metrics.Metric`. The order must match the order of variables in
+      `tf_keras.metrics.Metric`. The order must match the order of variables in
       `federated_values`.
     federated_values: A single federated value, or a `Sequence` of federated
       values. The values must all have `tff.CLIENTS` placement. If value is a
@@ -240,7 +245,7 @@ def federated_aggregate_keras_metric(
   Returns:
     The result of performing a federated sum on federated_values, then assigning
     the aggregated values into the variables of the corresponding
-    `tf.keras.metrics.Metric` and calling `tf.keras.metrics.Metric.result`. The
+    `tf_keras.metrics.Metric` and calling `tf_keras.metrics.Metric.result`. The
     resulting structure has `tff.SERVER` placement.
   """
   member_types = tf.nest.map_structure(
@@ -269,18 +274,19 @@ def federated_aggregate_keras_metric(
 
     def finalize_metric(
         metric: Union[
-            tf.keras.metrics.Metric, Callable[[], tf.keras.metrics.Metric]
+            tf_keras.metrics.Metric, Callable[[], tf_keras.metrics.Metric],
+            keras.metrics.Metric, Callable[[], keras.metrics.Metric]
         ],
         values,
     ):
-      # Note: if the input metric is an instance of `tf.keras.metrics.Metric`,
+      # Note: if the input metric is an instance of `tf_keras.metrics.Metric`,
       # the following call requires that `type(metric)` have a no argument
       # __init__ method, which will restrict the types of metrics that can be
       # used. This is somewhat limiting, but the pattern to use default
       # arguments and export the values in `get_config()` (see
-      # `tf.keras.metrics.TopKCategoricalAccuracy`) works well.
+      # `tf_keras.metrics.TopKCategoricalAccuracy`) works well.
       #
-      # If type(metric) is subclass of another tf.keras.metric arguments passed
+      # If type(metric) is subclass of another tf_keras.metric arguments passed
       # to __init__ must include arguments expected by the superclass and
       # specified in superclass get_config().
       keras_metric = keras_finalizer.create_keras_metric(metric)
@@ -291,7 +297,7 @@ def federated_aggregate_keras_metric(
       with tf.control_dependencies(assignments):
         return keras_metric.result()
 
-    if isinstance(metrics, tf.keras.metrics.Metric):
+    if isinstance(metrics, (tf_keras.metrics.Metric, keras.metrics.Metric)):
       # Only a single metric to aggregate.
       return finalize_metric(metrics, accumulators)
     else:
@@ -309,17 +315,19 @@ def federated_aggregate_keras_metric(
 
 
 class _KerasModel(variable.VariableModel):
-  """Internal wrapper class for tf.keras.Model objects."""
+  """Internal wrapper class for tf_keras.Model or keras.Model objects."""
 
   def __init__(
       self,
-      keras_model: tf.keras.Model,
+      keras_model: Model,
       input_spec,
-      loss_fns: list[tf.keras.losses.Loss],
+      loss_fns: Union[list[tf_keras.losses.Loss], list[keras.losses.Loss]],
       loss_weights: list[float],
       metrics: Union[
-          list[tf.keras.metrics.Metric],
-          list[Callable[[], tf.keras.metrics.Metric]],
+          list[tf_keras.metrics.Metric],
+          list[Callable[[], tf_keras.metrics.Metric]],
+          list[keras.metrics.Metric],
+          list[Callable[[], keras.metrics.Metric]],
       ],
   ):
     self._keras_model = keras_model
@@ -336,16 +344,16 @@ class _KerasModel(variable.VariableModel):
       has_keras_metric_constructor = False
 
       for metric in metrics:
-        if isinstance(metric, tf.keras.metrics.Metric):
+        if isinstance(metric, (tf_keras.metrics.Metric, keras.metrics.Metric)):
           self._metrics.append(metric)
           metric_names.add(metric.name)
           has_keras_metric = True
         elif callable(metric):
           constructed_metric = metric()
-          if not isinstance(constructed_metric, tf.keras.metrics.Metric):
+          if not isinstance(constructed_metric, (tf_keras.metrics.Metric, keras.metrics.Metric)):
             raise TypeError(
                 f'Metric constructor {metric} is not a no-arg callable that '
-                'creates a `tf.keras.metrics.Metric`, it created a '
+                'creates a `tf_keras.metrics.Metric` or a `keras.metrics.Metric`, it created a '
                 f'{type(constructed_metric).__name__}.'
             )
           metric_names.add(constructed_metric.name)
@@ -355,22 +363,22 @@ class _KerasModel(variable.VariableModel):
         else:
           raise TypeError(
               'Expected the input metric to be either a '
-              '`tf.keras.metrics.Metric` or a no-arg callable that constructs '
-              'a `tf.keras.metrics.Metric`, found a non-callable '
+              '`tf_keras.metrics.Metric`, `keras.metrics.Metric` or a no-arg callable that constructs '
+              'a `tf_keras.metrics.Metric` or a `keras.metrics.Metric`, found a non-callable '
               f'{py_typecheck.type_string(type(metric))}.'
           )
 
       if has_keras_metric and has_keras_metric_constructor:
         raise TypeError(
             'Expected the input `metrics` to be either a list of '
-            '`tf.keras.metrics.Metric` objects or a list of no-arg callables '
-            'that each constructs a `tf.keras.metrics.Metric`, '
+            '`tf_keras.metrics.Metric` objects or a list of no-arg callables '
+            'that each constructs a `tf_keras.metrics.Metric`, '
             f'found both types in the `metrics`: {metrics}.'
         )
 
     # This is defined here so that it closes over the `loss_fn`.
-    class _WeightedMeanLossMetric(tf.keras.metrics.Mean):
-      """A `tf.keras.metrics.Metric` wrapper for the loss function."""
+    class _WeightedMeanLossMetric(tf_keras.metrics.Mean):
+      """A `tf_keras.metrics.Metric` wrapper for the loss function."""
 
       def __init__(self, name='loss', dtype=tf.float32):
         super().__init__(name, dtype)
@@ -392,13 +400,47 @@ class _KerasModel(variable.VariableModel):
 
         return super().update_state(batch_loss, batch_size)
 
-    extra_metrics_constructors = [_WeightedMeanLossMetric]
-    if 'num_examples' not in metric_names:
-      logging.info('Adding default num_examples metric to model')
-      extra_metrics_constructors.append(counters.NumExamplesCounter)
-    if 'num_batches' not in metric_names:
-      logging.info('Adding default num_batches metric to model')
-      extra_metrics_constructors.append(counters.NumBatchesCounter)
+    class _Keras3WeightedMeanLossMetric(keras.metrics.Mean):
+      """A `tf_keras.metrics.Metric` wrapper for the loss function."""
+
+      def __init__(self, name='loss', dtype=tf.float32):
+        super().__init__(name, dtype)
+        self._loss_fns = loss_fns
+        self._loss_weights = loss_weights
+
+      def update_state(self, y_true, y_pred, sample_weight=None):  # pytype: disable=signature-mismatch
+        first_prediction = tf.nest.flatten(y_pred)[0]
+        batch_size = tf.shape(first_prediction)[0]
+
+        if len(self._loss_fns) == 1:
+          batch_loss = self._loss_fns[0](y_true, y_pred)
+        else:
+          batch_loss = tf.zeros(())
+          for i in range(len(self._loss_fns)):
+            batch_loss += self._loss_weights[i] * self._loss_fns[i](
+                y_true[i], y_pred[i]
+            )
+
+        return super().update_state(batch_loss, batch_size)
+
+    extra_metrics_constructors = []
+    if keras_compat.is_keras3(keras_model):
+      extra_metrics_constructors.append(_Keras3WeightedMeanLossMetric)
+      if 'num_examples' not in metric_names:
+        logging.info('Adding default num_examples metric to model')
+        extra_metrics_constructors.append(counters.Keras3NumExamplesCounter)
+      if 'num_batches' not in metric_names:
+        logging.info('Adding default num_batches metric to model')
+        extra_metrics_constructors.append(counters.Keras3NumBatchesCounter)
+    else:
+      extra_metrics_constructors.append(_WeightedMeanLossMetric)
+      if 'num_examples' not in metric_names:
+        logging.info('Adding default num_examples metric to model')
+        extra_metrics_constructors.append(counters.NumExamplesCounter)
+      if 'num_batches' not in metric_names:
+        logging.info('Adding default num_batches metric to model')
+        extra_metrics_constructors.append(counters.NumBatchesCounter)
+
     self._metrics.extend(m() for m in extra_metrics_constructors)
     if not metrics or self._metric_constructors:
       for m in extra_metrics_constructors:
@@ -457,7 +499,7 @@ class _KerasModel(variable.VariableModel):
         # Note: we add each of the per-layer regularization losses to the loss
         # that we use to update trainable parameters, in addition to the
         # user-provided loss function. Keras does the same in the
-        # `tf.keras.Model` training step. This is expected to have no effect if
+        # `tf_keras.Model` training step. This is expected to have no effect if
         # no per-layer losses are added to the model.
         batch_loss = tf.add_n(
             [loss_fn(y_true=y_true, y_pred=predictions)]
@@ -468,7 +510,7 @@ class _KerasModel(variable.VariableModel):
         # Note: we add each of the per-layer regularization losses to the losses
         # that we use to update trainable parameters, in addition to the
         # user-provided loss functions. Keras does the same in the
-        # `tf.keras.Model` training step. This is expected to have no effect if
+        # `tf_keras.Model` training step. This is expected to have no effect if
         # no per-layer losses are added to the model.
         batch_loss = tf.add_n([tf.zeros(())] + self._keras_model.losses)
         for i in range(len(self._loss_fns)):
@@ -519,7 +561,7 @@ class _KerasModel(variable.VariableModel):
     """
     outputs = collections.OrderedDict()
     for metric in self.get_metrics():
-      outputs[metric.name] = [v.read_value() for v in metric.variables]
+      outputs[metric.name] = [v.value if keras_compat.is_keras3(v) else v.read_value() for v in metric.variables]
     return outputs
 
   def metric_finalizers(
@@ -532,7 +574,7 @@ class _KerasModel(variable.VariableModel):
       a Keras
       metric is a `tf.function` decorated callable that takes in this metric's
       unfinalized values (created by `report_local_unfinalized_metrics`), and
-      returns the metric value computed by `tf.keras.metrics.Metric.result()`.
+      returns the metric value computed by `tf_keras.metrics.Metric.result()`.
       This method and the `report_local_unfinalized_metrics` method can be used
       to construct a cross-client metrics aggregator when defining the federated
       training processes or evaluation computations.

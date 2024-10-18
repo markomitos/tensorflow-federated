@@ -46,6 +46,25 @@ class CreateAutoencoderTaskTest(tf.test.TestCase, parameterized.TestCase):
       ('emnist_10', True),
       ('emnist_62', False),
   )
+  def test_constructs_with_eval_client_spec_keras3(self, only_digits):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
+    )
+    eval_client_spec = client_spec.ClientSpec(
+        num_epochs=1, batch_size=2, max_elements=5, shuffle_buffer_size=10
+    )
+    baseline_task_spec = autoencoder_tasks.create_autoencoder_task_keras3(
+        train_client_spec,
+        eval_client_spec=eval_client_spec,
+        only_digits=only_digits,
+        use_synthetic_data=True,
+    )
+    self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
+
+  @parameterized.named_parameters(
+      ('emnist_10', True),
+      ('emnist_62', False),
+  )
   def test_constructs_with_no_eval_client_spec(self, only_digits):
     train_client_spec = client_spec.ClientSpec(
         num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
@@ -54,6 +73,21 @@ class CreateAutoencoderTaskTest(tf.test.TestCase, parameterized.TestCase):
         train_client_spec, only_digits=only_digits, use_synthetic_data=True
     )
     self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
+
+
+  @parameterized.named_parameters(
+      ('emnist_10', True),
+      ('emnist_62', False),
+  )
+  def test_constructs_with_no_eval_client_spec_keras3(self, only_digits):
+    train_client_spec = client_spec.ClientSpec(
+        num_epochs=2, batch_size=10, max_elements=3, shuffle_buffer_size=5
+    )
+    baseline_task_spec = autoencoder_tasks.create_autoencoder_task_keras3(
+        train_client_spec, only_digits=only_digits, use_synthetic_data=True
+    )
+    self.assertIsInstance(baseline_task_spec, baseline_task.BaselineTask)
+
 
 
 if __name__ == '__main__':

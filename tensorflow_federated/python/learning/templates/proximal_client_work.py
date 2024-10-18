@@ -25,6 +25,8 @@ from typing import Any, Optional, Union
 
 from absl import logging
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.common_libs import py_typecheck
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -55,11 +57,11 @@ def build_model_delta_update_with_tff_optimizer(
 ):
   """Creates client update logic in FedProx using a TFF optimizer.
 
-  In contrast to using a `tf.keras.optimizers.Optimizer`, we avoid creating
+  In contrast to using a `tf_keras.optimizers.Optimizer`, we avoid creating
   `tf.Variable`s associated with the optimizer state within the scope of the
   client work, as they are not necessary. This also means that the client's
   model weights are updated by computing `optimizer.next` and then assigning
-  the result to the model weights (while a `tf.keras.optimizers.Optimizer` will
+  the result to the model weights (while a `tf_keras.optimizers.Optimizer` will
   modify the model weight in place using `optimizer.apply_gradients`).
 
   Args:
@@ -164,7 +166,7 @@ def build_model_delta_update_with_keras_optimizer(
     delta_l2_regularizer,
     use_experimental_simulation_loop: bool = False,
 ):
-  """Creates client update logic in FedProx using a `tf.keras` optimizer.
+  """Creates client update logic in FedProx using a `tf_keras` optimizer.
 
   In contrast to using a `tff.learning.optimizers.Optimizer`, we have to
   maintain `tf.Variable`s associated with the optimizer state within the scope
@@ -382,7 +384,9 @@ def _choose_client_weight(weighting, has_non_finite_delta, num_examples):
 def build_model_delta_client_work(
     model_fn: Callable[[], variable.VariableModel],
     optimizer: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer,
+        Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer]
     ],
     client_weighting: client_weight_lib.ClientWeighting,
     delta_l2_regularizer: float,
@@ -394,13 +398,13 @@ def build_model_delta_client_work(
 
   This client work is constructed in slightly different manners depending on
   whether `optimizer` is a `tff.learning.optimizers.Optimizer`, or a no-arg
-  callable returning a `tf.keras.optimizers.Optimizer`.
+  callable returning a `tf_keras.optimizers.Optimizer`.
 
   If it is a `tff.learning.optimizers.Optimizer`, we avoid creating
   `tf.Variable`s associated with the optimizer state within the scope of the
   client work, as they are not necessary. This also means that the client's
   model weights are updated by computing `optimizer.next` and then assigning
-  the result to the model weights (while a `tf.keras.optimizers.Optimizer` will
+  the result to the model weights (while a `tf_keras.optimizers.Optimizer` will
   modify the model weight in place using `optimizer.apply_gradients`).
 
   In contrast to FedAvg, this client work employs L2 regularization towards the
@@ -413,7 +417,7 @@ def build_model_delta_client_work(
       constructed entirely from scratch on each invocation, returning the same
       pre-constructed model each call will result in an error.
     optimizer: A `tff.learning.optimizers.Optimizer`, or a no-arg callable that
-      returns a `tf.keras.Optimizer`.
+      returns a `tf_keras.Optimizer`.
     client_weighting:  A `tff.learning.ClientWeighting` value.
     delta_l2_regularizer: A nonnegative float representing the parameter of the
       L2-regularization term applied to the delta from initial model weights
@@ -451,7 +455,7 @@ def build_model_delta_client_work(
   ):
     raise TypeError(
         'Provided optimizer must a either a tff.learning.optimizers.Optimizer '
-        'or a no-arg callable returning an tf.keras.optimizers.Optimizer.'
+        'or a no-arg callable returning an tf_keras.optimizers.Optimizer.'
     )
 
   if metrics_aggregator is None:
@@ -565,7 +569,8 @@ def build_functional_model_delta_client_work(
   ):
     raise TypeError(
         'Provided optimizer must a either a tff.learning.optimizers.Optimizer '
-        'or a no-arg callable returning an tf.keras.optimizers.Optimizer.'
+        'or a no-arg callable returning an tf_keras.optimizers.Optimizer or'
+        'a keras.optimizers.Optimizer.'
     )
 
   if metrics_aggregator is None:

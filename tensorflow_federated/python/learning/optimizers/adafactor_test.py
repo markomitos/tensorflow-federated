@@ -15,6 +15,8 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -124,7 +126,32 @@ class AdafactorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertSequenceEqual(tff_state['moments'][0].v.shape, test_shape)
 
     tff_weights = tf.zeros(shape=test_shape)
-    keras_optimizer = tf.keras.optimizers.Adafactor(**optimizer_kwargs)
+    keras_optimizer = tf_keras.optimizers.Adafactor(**optimizer_kwargs)
+    keras_variable = tf.Variable(initial_value=tff_weights, dtype=tf.float32)
+    gradient = tf.ones_like(tff_weights) * -0.1
+    for _ in range(10):
+      tff_state, tff_weights = tff_optimizer.next(
+          state=tff_state, weights=tff_weights, gradients=gradient
+      )
+      keras_optimizer.apply_gradients([(gradient, keras_variable)])
+      self.assertAllClose(tff_weights, keras_variable)
+
+  @parameterized.named_parameters(*_TEST_PARAMETERS)
+  def test_single_rank_compare_to_keras3(self, **optimizer_kwargs):
+    test_shape = [1]
+    tff_optimizer = adafactor.build_adafactor(**optimizer_kwargs)
+    tff_state = tff_optimizer.initialize(
+        tf.TensorSpec(shape=test_shape, dtype=tf.float32)
+    )
+    # Assert the shapes of the factorized moments are zero for
+    # weights with less than rank two.
+    self.assertLen(tff_state['moments'], 1)
+    self.assertSequenceEqual(tff_state['moments'][0].r.shape, [0])
+    self.assertSequenceEqual(tff_state['moments'][0].c.shape, [0])
+    self.assertSequenceEqual(tff_state['moments'][0].v.shape, test_shape)
+
+    tff_weights = tf.zeros(shape=test_shape)
+    keras_optimizer = keras.optimizers.Adafactor(**optimizer_kwargs)
     keras_variable = tf.Variable(initial_value=tff_weights, dtype=tf.float32)
     gradient = tf.ones_like(tff_weights) * -0.1
     for _ in range(10):
@@ -148,7 +175,31 @@ class AdafactorTest(parameterized.TestCase, tf.test.TestCase):
     self.assertSequenceEqual(tff_state['moments'][0].v.shape, test_shape)
 
     tff_weights = tf.zeros(shape=test_shape)
-    keras_optimizer = tf.keras.optimizers.Adafactor(**optimizer_kwargs)
+    keras_optimizer = tf_keras.optimizers.Adafactor(**optimizer_kwargs)
+    keras_variable = tf.Variable(initial_value=tff_weights, dtype=tf.float32)
+    gradient = tf.ones_like(tff_weights) * -0.1
+    for _ in range(10):
+      tff_state, tff_weights = tff_optimizer.next(
+          state=tff_state, weights=tff_weights, gradients=gradient
+      )
+      keras_optimizer.apply_gradients([(gradient, keras_variable)])
+      self.assertAllClose(tff_weights, keras_variable)
+
+  @parameterized.named_parameters(*_TEST_PARAMETERS)
+  def test_double_rank_compare_to_keras(self, **optimizer_kwargs):
+    test_shape = [10, 20]
+    tff_optimizer = adafactor.build_adafactor(**optimizer_kwargs)
+    tff_state = tff_optimizer.initialize(
+        tf.TensorSpec(shape=test_shape, dtype=tf.float32)
+    )
+    # Assert the shapes of the factorized moments are as expected for weights
+    # with rank 2 or more.
+    self.assertSequenceEqual(tff_state['moments'][0].r.shape, test_shape[:1])
+    self.assertSequenceEqual(tff_state['moments'][0].c.shape, test_shape[1:])
+    self.assertSequenceEqual(tff_state['moments'][0].v.shape, test_shape)
+
+    tff_weights = tf.zeros(shape=test_shape)
+    keras_optimizer = keras.optimizers.Adafactor(**optimizer_kwargs)
     keras_variable = tf.Variable(initial_value=tff_weights, dtype=tf.float32)
     gradient = tf.ones_like(tff_weights) * -0.1
     for _ in range(10):

@@ -26,7 +26,6 @@ py_library(
     deps = [
         ":concat",
         ":differential_privacy",
-        ":encoded",
         ":factory",
         ":factory_utils",
         ":mean",
@@ -258,39 +257,6 @@ py_test(
         "//tensorflow_federated/python/core/templates:estimation_process",
         "//tensorflow_federated/python/core/templates:measured_process",
         "//tensorflow_federated/python/core/test:static_assert",
-    ],
-)
-
-py_library(
-    name = "encoded",
-    srcs = ["encoded.py"],
-    deps = [
-        ":factory",
-        "//tensorflow_federated/python/common_libs:py_typecheck",
-        "//tensorflow_federated/python/core/environments/tensorflow_frontend:tensorflow_computation",
-        "//tensorflow_federated/python/core/impl/federated_context:federated_computation",
-        "//tensorflow_federated/python/core/impl/federated_context:intrinsics",
-        "//tensorflow_federated/python/core/impl/types:array_shape",
-        "//tensorflow_federated/python/core/impl/types:computation_types",
-        "//tensorflow_federated/python/core/impl/types:placements",
-        "//tensorflow_federated/python/core/impl/types:type_conversions",
-        "//tensorflow_federated/python/core/templates:aggregation_process",
-        "//tensorflow_federated/python/core/templates:measured_process",
-    ],
-)
-
-py_test(
-    name = "encoded_test",
-    size = "medium",
-    srcs = ["encoded_test.py"],
-    deps = [
-        ":encoded",
-        ":factory",
-        "//tensorflow_federated/python/core/backends/native:execution_contexts",
-        "//tensorflow_federated/python/core/impl/types:computation_types",
-        "//tensorflow_federated/python/core/impl/types:placements",
-        "//tensorflow_federated/python/core/templates:aggregation_process",
-        "//tensorflow_federated/python/core/templates:measured_process",
     ],
 )
 

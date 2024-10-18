@@ -17,6 +17,8 @@ import collections
 from absl.testing import absltest
 import numpy as np
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.common_libs import structure
 from tensorflow_federated.python.core.impl.types import computation_types
@@ -149,9 +151,22 @@ class WeightsTypeFromModelTest(absltest.TestCase):
 class AssignWeightsToTest(tf.test.TestCase):
 
   def test_weights_to_keras_model(self):
-    keras_model = tf.keras.Sequential([
-        tf.keras.layers.InputLayer(input_shape=[5]),
-        tf.keras.layers.Dense(
+    keras_model = tf_keras.Sequential([
+        tf_keras.layers.InputLayer(input_shape=[5]),
+        tf_keras.layers.Dense(
+            units=1, use_bias=False, kernel_initializer='zeros'
+        ),
+    ])
+    self.assertAllEqual(keras_model.trainable_weights, [tf.zeros([5, 1])])
+    model_weights.ModelWeights(
+        trainable=(tf.ones([5, 1]),), non_trainable=()
+    ).assign_weights_to(keras_model)
+    self.assertAllEqual(keras_model.trainable_weights, [tf.ones([5, 1])])
+
+  def test_weights_to_keras3_model(self):
+    keras_model = keras.Sequential([
+        keras.layers.InputLayer(input_shape=[5]),
+        keras.layers.Dense(
             units=1, use_bias=False, kernel_initializer='zeros'
         ),
     ])

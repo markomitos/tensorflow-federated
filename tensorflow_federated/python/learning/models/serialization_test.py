@@ -19,6 +19,7 @@ import os
 from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -259,12 +260,12 @@ class _TestModel(variable.VariableModel):
   """Test model that returns different signatures when `training` value changes."""
 
   def __init__(self, has_reset_metrics_implemented=False):
-    input_tensor = tf.keras.layers.Input(shape=(3,))
-    logits = tf.keras.layers.Dense(
+    input_tensor = tf_keras.layers.Input(shape=(3,))
+    logits = tf_keras.layers.Dense(
         5,
     )(input_tensor)
-    predictions = tf.keras.layers.Softmax()(logits)
-    self._model = tf.keras.Model(
+    predictions = tf_keras.layers.Softmax()(logits)
+    self._model = tf_keras.Model(
         inputs=[input_tensor], outputs=[logits, predictions]
     )
     self._has_reset_metrics_implemented = has_reset_metrics_implemented
@@ -281,7 +282,7 @@ class _TestModel(variable.VariableModel):
   @tf.function
   def forward_pass(self, batch_input, training=True):
     if training:
-      loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+      loss_fn = tf_keras.losses.SparseCategoricalCrossentropy(from_logits=True)
       logits = self.predict_on_batch(batch_input['x'], training=True)
       loss = loss_fn(y_true=batch_input['y'], y_pred=logits)
       num_examples = tf.shape(logits)[0]
@@ -349,7 +350,7 @@ _TEST_MODEL_FNS = [
         'keras_linear_regression_tuple_input',
         _test_model_fn(
             model_examples.build_linear_regression_keras_sequential_model,
-            tf.keras.losses.MeanSquaredError,
+            tf_keras.losses.MeanSquaredError,
             (
                 tf.TensorSpec(shape=[None, 2], dtype=tf.float32),
                 tf.TensorSpec(shape=[None, 1], dtype=tf.float32),
@@ -360,7 +361,7 @@ _TEST_MODEL_FNS = [
         'keras_with_embedding',
         _test_model_fn(
             model_examples.build_embedding_keras_model,
-            tf.keras.losses.SparseCategoricalCrossentropy,
+            tf_keras.losses.SparseCategoricalCrossentropy,
             collections.OrderedDict(
                 x=tf.TensorSpec(shape=[None], dtype=tf.float32),
                 y=tf.TensorSpec(shape=[None], dtype=tf.float32),
@@ -371,7 +372,7 @@ _TEST_MODEL_FNS = [
         'keras_multiple_input',
         _test_model_fn(
             model_examples.build_multiple_inputs_keras_model,
-            tf.keras.losses.MeanSquaredError,
+            tf_keras.losses.MeanSquaredError,
             collections.OrderedDict(
                 x=collections.OrderedDict(
                     a=tf.TensorSpec(shape=[None, 1], dtype=tf.float32),
@@ -385,7 +386,7 @@ _TEST_MODEL_FNS = [
         'keras_multiple_output',
         _test_model_fn(
             model_examples.build_multiple_outputs_keras_model,
-            tf.keras.losses.MeanSquaredError,
+            tf_keras.losses.MeanSquaredError,
             collections.OrderedDict(
                 x=(
                     tf.TensorSpec(shape=[None, 1], dtype=tf.float32),
@@ -562,15 +563,15 @@ def create_test_keras_functional_model(input_spec):
   # We must create the functional model that wraps a keras model in a graph
   # context (see IMPORTANT note in `functional_model_from_keras`), otherwise
   # we'll get non-model Variables.
-  keras_model = tf.keras.Sequential([
-      tf.keras.layers.InputLayer(input_shape=[3]),
-      tf.keras.layers.Dense(
+  keras_model = tf_keras.Sequential([
+      tf_keras.layers.InputLayer(input_shape=[3]),
+      tf_keras.layers.Dense(
           1, kernel_initializer='zeros', bias_initializer='zeros'
       ),
   ])
   return functional.functional_model_from_keras(
       keras_model,
-      loss_fn=tf.keras.losses.MeanSquaredError(),
+      loss_fn=tf_keras.losses.MeanSquaredError(),
       input_spec=input_spec,
   )
 

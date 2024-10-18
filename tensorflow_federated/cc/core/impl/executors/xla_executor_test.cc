@@ -32,13 +32,6 @@ limitations under the License
 #include "absl/status/statusor.h"
 #include "tensorflow/compiler/tf2xla/shape_util.h"
 #include "tensorflow/compiler/tf2xla/type_util.h"
-#include "tensorflow/compiler/xla/client/xla_builder.h"
-#include "tensorflow/compiler/xla/client/xla_computation.h"
-#include "tensorflow/compiler/xla/service/platform_util.h"
-#include "tensorflow/compiler/xla/shape.h"
-#include "tensorflow/compiler/xla/shape_util.h"
-#include "tensorflow/compiler/xla/stream_executor/platform.h"
-#include "tensorflow/compiler/xla/xla_data.pb.h"
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/types.pb.h"
 #include "tensorflow/core/platform/statusor.h"
@@ -53,6 +46,13 @@ limitations under the License
 #include "tensorflow_federated/proto/v0/array.pb.h"
 #include "tensorflow_federated/proto/v0/computation.pb.h"
 #include "tensorflow_federated/proto/v0/data_type.pb.h"
+#include "xla/client/xla_builder.h"
+#include "xla/client/xla_computation.h"
+#include "xla/service/platform_util.h"
+#include "xla/shape.h"
+#include "xla/shape_util.h"
+#include "xla/stream_executor/platform.h"
+#include "xla/xla_data.pb.h"
 
 ABSL_FLAG(std::string, tff_xla_executor_test_platform, "Host",
           "The name of the XLA platform to run the tests on. By default will "
@@ -248,7 +248,7 @@ TEST_F(XLAExecutorTest, RoundTripStringTensorFails) {
   // String tensors are unsupported in XLA; see
   // https://github.com/tensorflow/tensorflow/issues/19140, and the enumeration
   // of primitive dtypes at
-  // https://github.com/tensorflow/tensorflow/blob/master/tensorflow/compiler/xla/xla_data.proto
+  // https://github.com/tensorflow/tensorflow/blob/master/third_party/xla/xla/xla_data.proto
   auto string_tensor = TensorV("a_string");
   CheckRoundTripFails(
       string_tensor,

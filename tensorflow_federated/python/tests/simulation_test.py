@@ -18,15 +18,25 @@ from collections.abc import Callable
 from absl.testing import parameterized
 import tensorflow as tf
 import tensorflow_federated as tff
-
+import tf_keras
+import keras
 
 def learning_process_builder(
     model_fn: Callable[[], tff.learning.models.VariableModel]
 ) -> tff.learning.templates.LearningProcess:
   return tff.learning.algorithms.build_weighted_fed_avg(
       model_fn=model_fn,
-      client_optimizer_fn=tf.keras.optimizers.SGD,
-      server_optimizer_fn=tf.keras.optimizers.SGD,
+      client_optimizer_fn=tf_keras.optimizers.SGD,
+      server_optimizer_fn=tf_keras.optimizers.SGD,
+  )
+
+def learning_process_builder_keras3(
+    model_fn: Callable[[], tff.learning.models.VariableModel]
+) -> tff.learning.templates.LearningProcess:
+  return tff.learning.algorithms.build_weighted_fed_avg(
+      model_fn=model_fn,
+      client_optimizer_fn=keras.optimizers.SGD,
+      server_optimizer_fn=keras.optimizers.SGD,
   )
 
 
@@ -38,16 +48,32 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
           tff.simulation.baselines.cifar100.create_image_classification_task,
       ),
       (
+          'cifar100_image_classification_keras3',
+          tff.simulation.baselines.cifar100.create_image_classification_task_keras3,
+      ),
+      (
           'emnist_autoencoder',
           tff.simulation.baselines.emnist.create_autoencoder_task,
+      ),
+      (
+          'emnist_autoencoder_keras3',
+          tff.simulation.baselines.emnist.create_autoencoder_task_keras3,
       ),
       (
           'emnist_character_recognition',
           tff.simulation.baselines.emnist.create_character_recognition_task,
       ),
       (
+          'emnist_character_recognition_keras3',
+          tff.simulation.baselines.emnist.create_character_recognition_task_keras3,
+      ),
+      (
           'shakespeare_character_prediction',
           tff.simulation.baselines.shakespeare.create_character_prediction_task,
+      ),
+      (
+          'shakespeare_character_prediction_keras3',
+          tff.simulation.baselines.shakespeare.create_character_prediction_task_keras3,
       ),
   )
   def test_run_federated(self, baseline_task_fn):
@@ -56,7 +82,10 @@ class FederatedTasksTest(tf.test.TestCase, parameterized.TestCase):
     )
     baseline_task = baseline_task_fn(train_client_spec, use_synthetic_data=True)
 
-    process = learning_process_builder(baseline_task.model_fn)
+    if 'keras3' in str(baseline_task_fn):
+      process = learning_process_builder_keras3(baseline_task.model_fn)
+    else:
+      process = learning_process_builder(baseline_task.model_fn)
 
     def client_selection_fn(round_num: int) -> list[tf.data.Dataset]:
       del round_num

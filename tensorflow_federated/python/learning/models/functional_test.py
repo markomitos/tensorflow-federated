@@ -18,6 +18,8 @@ from typing import Any, Optional
 
 import numpy as np
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.impl.federated_context import federated_computation
@@ -28,7 +30,8 @@ from tensorflow_federated.python.learning.metrics import types
 from tensorflow_federated.python.learning.models import functional
 from tensorflow_federated.python.learning.models import variable
 from tensorflow_federated.python.tensorflow_libs import variable_utils
-
+from tensorflow_federated.python.common_libs import keras_compat
+import absl.testing.absltest
 
 def initial_weights():
   """Returns lists of trainable variables and non-trainable variables."""
@@ -121,9 +124,18 @@ def finalize_metrics(state: types.MetricsState) -> Any:
 
 
 def create_test_keras_model():
-  return tf.keras.models.Sequential([
-      tf.keras.layers.InputLayer(input_shape=(1,)),
-      tf.keras.layers.Dense(
+  return tf_keras.models.Sequential([
+      tf_keras.layers.InputLayer(input_shape=(1,)),
+      tf_keras.layers.Dense(
+          1, kernel_initializer='zeros', bias_initializer='zeros'
+      ),
+  ])
+
+
+def create_test_keras3_model():
+  return keras.models.Sequential([
+      keras.layers.Input(shape=(1,)),
+      keras.layers.Dense(
           1, kernel_initializer='zeros', bias_initializer='zeros'
       ),
   ])
@@ -372,7 +384,36 @@ class FunctionalModelTest(tf.test.TestCase):
         loss_fn=loss,
         input_spec=input_spec,
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.05)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.05)
+    variables = tf.nest.map_structure(
+        tf.Variable, functional_model.initial_weights
+    )
+    trainable = variables[0]
+    loss_value = None
+    num_epochs = 50
+    for batch in dataset.repeat(num_epochs):
+      with tf.GradientTape() as tape:
+        batch_output = functional_model.predict_on_batch(
+            model_weights=variables, x=batch[0], training=True
+        )
+        batch_loss = functional_model.loss(output=batch_output, label=batch[1])
+      gradients = tape.gradient(batch_loss, trainable)
+      optimizer.apply_gradients(zip(gradients, trainable))
+      loss_value = batch_loss
+    # Expect some amount of convergence after a few epochs of the dataset.
+    self.assertLess(loss_value, 0.1)
+    self.assertAllClose(trainable, ([[1.0, 2.0, 3.0]], [5.0]), atol=0.5)
+
+  def test_functional_model_converges_keras3(self):
+    dataset = create_test_dataset()
+    input_spec = dataset.element_spec
+    functional_model = functional.FunctionalModel(
+        initial_weights=initial_weights(),
+        predict_on_batch_fn=predict_on_batch,
+        loss_fn=loss,
+        input_spec=input_spec,
+    )
+    optimizer = keras.optimizers.SGD(learning_rate=0.05)
     variables = tf.nest.map_structure(
         tf.Variable, functional_model.initial_weights
     )
@@ -460,7 +501,38 @@ class ModelFromFunctionalModelTest(tf.test.TestCase):
         input_spec=input_spec,
     )
     tff_model = functional.model_from_functional(functional_model)
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.05)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.05)
+    loss_value = None
+    num_epochs = 50
+    for batch in dataset.repeat(num_epochs):
+      with tf.GradientTape() as tape:
+        batch_output = tff_model.forward_pass(batch, training=True)
+      gradients = tape.gradient(
+          batch_output.loss, tff_model.trainable_variables
+      )
+      optimizer.apply_gradients(zip(gradients, tff_model.trainable_variables))
+      loss_value = batch_output.loss
+    # Expect some amount of convergence after a few epochs of the dataset.
+    self.assertLess(loss_value, 0.1)
+    self.assertAllClose(
+        tff_model.trainable_variables, ([[1.0, 2.0, 3.0]], [5.0]), atol=0.5
+    )
+    self.assertAllClose(
+        tff_model.report_local_unfinalized_metrics(),
+        collections.OrderedDict(loss=[1066.19628, 1250.0]),
+    )
+
+  def test_tff_model_from_functional_converges_keras3(self):
+    dataset = create_test_dataset()
+    input_spec = dataset.element_spec
+    functional_model = functional.FunctionalModel(
+        initial_weights=initial_weights(),
+        predict_on_batch_fn=predict_on_batch,
+        loss_fn=loss,
+        input_spec=input_spec,
+    )
+    tff_model = functional.model_from_functional(functional_model)
+    optimizer = keras.optimizers.SGD(learning_rate=0.05)
     loss_value = None
     num_epochs = 50
     for batch in dataset.repeat(num_epochs):
@@ -491,8 +563,26 @@ class ModelFromFunctionalModelTest(tf.test.TestCase):
         input_spec=input_spec,
     )
     metric_constructors = [
-        lambda: tf.keras.metrics.MeanSquaredError(name='same_name'),
-        lambda: tf.keras.metrics.RootMeanSquaredError(name='same_name'),
+        lambda: tf_keras.metrics.MeanSquaredError(name='same_name'),
+        lambda: tf_keras.metrics.RootMeanSquaredError(name='same_name'),
+    ]
+    with self.assertRaisesRegex(
+        ValueError, 'each metric should have a unique name'
+    ):
+      functional.model_from_functional(functional_model, metric_constructors)
+
+  def test_tff_model_from_functional_fails_with_repeated_metric_names_keras3(self):
+    dataset = create_test_dataset()
+    input_spec = dataset.element_spec
+    functional_model = functional.FunctionalModel(
+        initial_weights=initial_weights(),
+        predict_on_batch_fn=predict_on_batch,
+        loss_fn=loss,
+        input_spec=input_spec,
+    )
+    metric_constructors = [
+        lambda: keras.metrics.MeanSquaredError(name='same_name'),
+        lambda: keras.metrics.RootMeanSquaredError(name='same_name'),
     ]
     with self.assertRaisesRegex(
         ValueError, 'each metric should have a unique name'
@@ -509,13 +599,57 @@ class ModelFromFunctionalModelTest(tf.test.TestCase):
         input_spec=input_spec,
     )
     metric_constructors = [
-        tf.keras.metrics.MeanSquaredError,
-        tf.keras.metrics.RootMeanSquaredError,
+        tf_keras.metrics.MeanSquaredError,
+        tf_keras.metrics.RootMeanSquaredError,
     ]
     tff_model = functional.model_from_functional(
         functional_model, metric_constructors
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.05)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.05)
+    loss_value = None
+    num_epochs = 50
+    for batch in dataset.repeat(num_epochs):
+      with tf.GradientTape() as tape:
+        batch_output = tff_model.forward_pass(batch, training=True)
+      gradients = tape.gradient(
+          batch_output.loss, tff_model.trainable_variables
+      )
+      optimizer.apply_gradients(zip(gradients, tff_model.trainable_variables))
+      loss_value = batch_output.loss
+    # Expect some amount of convergence after a few epochs of the dataset.
+    self.assertLess(loss_value, 0.1)
+    self.assertAllClose(
+        tff_model.trainable_variables, ([[1.0, 2.0, 3.0]], [5.0]), atol=0.5
+    )
+    self.assertAllClose(
+        tff_model.report_local_unfinalized_metrics(),
+        collections.OrderedDict(
+            # The model uses mean squred error as `loss`, so the other two
+            # metrics (`mean_squared_error` and `root_mean_squared_error`)
+            # should have the same state as `loss`.
+            loss=[1066.19628, 1250.0],
+            mean_squared_error=[1066.19628, 1250.0],
+            root_mean_squared_error=[1066.19628, 1250.0],
+        ),
+    )
+
+  def test_tff_model_from_functional_binding_metrics_succeeds_keras3(self):
+    dataset = create_test_dataset()
+    input_spec = dataset.element_spec
+    functional_model = functional.FunctionalModel(
+        initial_weights=initial_weights(),
+        predict_on_batch_fn=predict_on_batch,
+        loss_fn=loss,
+        input_spec=input_spec,
+    )
+    metric_constructors = [
+        keras.metrics.MeanSquaredError,
+        keras.metrics.RootMeanSquaredError,
+    ]
+    tff_model = functional.model_from_functional(
+        functional_model, metric_constructors
+    )
+    optimizer = keras.optimizers.SGD(learning_rate=0.05)
     loss_value = None
     num_epochs = 50
     for batch in dataset.repeat(num_epochs):
@@ -558,13 +692,62 @@ class ModelFromFunctionalModelTest(tf.test.TestCase):
         input_spec=input_spec,
     )
     metric_constructors = [
-        tf.keras.metrics.MeanSquaredError,
-        tf.keras.metrics.RootMeanSquaredError,
+        tf_keras.metrics.MeanSquaredError,
+        tf_keras.metrics.RootMeanSquaredError,
     ]
     tff_model = functional.model_from_functional(
         functional_model, metric_constructors
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.05)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.05)
+    loss_value = None
+    num_epochs = 50
+    for batch in dataset.repeat(num_epochs):
+      with tf.GradientTape() as tape:
+        batch_output = tff_model.forward_pass(batch, training=True)
+      gradients = tape.gradient(
+          batch_output.loss, tff_model.trainable_variables
+      )
+      optimizer.apply_gradients(zip(gradients, tff_model.trainable_variables))
+      loss_value = batch_output.loss
+    # Expect some amount of convergence after a few epochs of the dataset.
+    self.assertLess(loss_value, 0.1)
+    self.assertAllClose(
+        tff_model.trainable_variables, ([[1.0, 2.0, 3.0]], [5.0]), atol=0.5
+    )
+    self.assertAllClose(
+        tff_model.report_local_unfinalized_metrics(),
+        collections.OrderedDict(
+            # The model uses mean squred error as `loss`, so the other two
+            # metrics (`mean_squared_error` and `root_mean_squared_error`)
+            # should have the same state as `loss`.
+            loss=[1066.19628, 1250.0],
+            mean_squared_error=[1066.19628, 1250.0],
+            root_mean_squared_error=[1066.19628, 1250.0],
+        ),
+    )
+
+  def test_tff_model_from_functional_overwrites_metrics_keras3(self):
+    dataset = create_test_dataset()
+    input_spec = dataset.element_spec
+    functional_model = functional.FunctionalModel(
+        initial_weights=initial_weights(),
+        predict_on_batch_fn=predict_on_batch,
+        loss_fn=loss,
+        metrics_fns=(
+            initialize_metrics,
+            update_metrics_state,
+            finalize_metrics,
+        ),
+        input_spec=input_spec,
+    )
+    metric_constructors = [
+        keras.metrics.MeanSquaredError,
+        keras.metrics.RootMeanSquaredError,
+    ]
+    tff_model = functional.model_from_functional(
+        functional_model, metric_constructors
+    )
+    optimizer = keras.optimizers.SGD(learning_rate=0.05)
     loss_value = None
     num_epochs = 50
     for batch in dataset.repeat(num_epochs):
@@ -602,8 +785,65 @@ class ModelFromFunctionalModelTest(tf.test.TestCase):
         input_spec=input_spec,
     )
     metric_constructors = [
-        lambda: tf.keras.metrics.MeanSquaredError(name='mse'),
-        lambda: tf.keras.metrics.MeanAbsoluteError(name='mae'),
+        lambda: tf_keras.metrics.MeanSquaredError(name='mse'),
+        lambda: tf_keras.metrics.MeanAbsoluteError(name='mae'),
+    ]
+    tff_model = functional.model_from_functional(
+        functional_model, metric_constructors
+    )
+    client_1_local_outputs = collections.OrderedDict(
+        loss=[1.0, 2.0], mse=[1.0, 2.0], mae=[1.0, 2.0]
+    )
+    client_2_local_outputs = collections.OrderedDict(
+        loss=[2.0, 4.0], mse=[2.0, 2.0], mae=[1.0, 6.0]
+    )
+    metrics_aggregator = aggregator.sum_then_finalize
+    unfinalized_metrics_type = computation_types.to_type(
+        collections.OrderedDict(
+            loss=[np.float32, np.float32],
+            mse=[np.float32, np.float32],
+            mae=[np.float32, np.float32],
+        )
+    )
+
+    metrics_aggregation_computation = metrics_aggregator(
+        tff_model.metric_finalizers(), unfinalized_metrics_type
+    )
+    # Tell TFF that the argument is CLIENTS placed, so that when this
+    # computation is later invoked on a list of values, TFF will teach each
+    # element of the list as a single client value. This cannot be inferred from
+    # the value itself.
+    @federated_computation.federated_computation(
+        computation_types.FederatedType(
+            unfinalized_metrics_type, placements.CLIENTS
+        )
+    )
+    def aggregate_metrics(metrics):
+      return metrics_aggregation_computation(metrics)
+
+    aggregated_metrics = aggregate_metrics(
+        [client_1_local_outputs, client_2_local_outputs]
+    )
+    self.assertAllClose(
+        aggregated_metrics,
+        # loss = (1.0+2.0)/(2.0+4.0) = 0.5
+        # mse = (1.0+2.0)/(2.0+2.0) = 0.75
+        # mae = (1.0+1.0)/(2.0+6.0) = 0.25
+        collections.OrderedDict(loss=0.5, mse=0.75, mae=0.25),
+    )
+
+  def test_tff_model_from_functional_federated_aggregate_metrics_succeeds_keras3(self):
+    dataset = create_test_dataset()
+    input_spec = dataset.element_spec
+    functional_model = functional.FunctionalModel(
+        initial_weights=initial_weights(),
+        predict_on_batch_fn=predict_on_batch,
+        loss_fn=loss,
+        input_spec=input_spec,
+    )
+    metric_constructors = [
+        lambda: keras.metrics.MeanSquaredError(name='mse'),
+        lambda: keras.metrics.MeanAbsoluteError(name='mae'),
     ]
     tff_model = functional.model_from_functional(
         functional_model, metric_constructors
@@ -659,13 +899,69 @@ class ModelFromFunctionalModelTest(tf.test.TestCase):
         input_spec=input_spec,
     )
     metric_constructors = [
-        tf.keras.metrics.MeanSquaredError,
-        tf.keras.metrics.RootMeanSquaredError,
+        tf_keras.metrics.MeanSquaredError,
+        tf_keras.metrics.RootMeanSquaredError,
     ]
     tff_model = functional.model_from_functional(
         functional_model, metric_constructors
     )
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.05)
+    optimizer = tf_keras.optimizers.SGD(learning_rate=0.05)
+
+    expected_initial_local_variables = [0.0, 0, 0.0, 0.0, 0.0, 0.0]
+    self.assertSequenceEqual(
+        tff_model.local_variables, expected_initial_local_variables
+    )
+
+    # Execute forward pass on the dataset, assert metrics are not zero.
+    for batch in dataset:
+      with tf.GradientTape() as tape:
+        batch_output = tff_model.forward_pass(batch, training=True)
+      gradients = tape.gradient(
+          batch_output.loss, tff_model.trainable_variables
+      )
+      optimizer.apply_gradients(zip(gradients, tff_model.trainable_variables))
+      loss_value = batch_output.loss
+    self.assertGreater(loss_value, 0)
+    self.assertAllClose(
+        tff_model.report_local_unfinalized_metrics(),
+        collections.OrderedDict(
+            loss=[876.11523, 25.0],
+            mean_squared_error=[876.11523, 25.0],
+            root_mean_squared_error=[876.11523, 25.0],
+        ),
+    )
+
+    # Reset metrics variables.
+    tff_model.reset_metrics()
+    self.assertSequenceEqual(
+        tff_model.local_variables, expected_initial_local_variables
+    )
+    self.assertEqual(
+        tff_model.report_local_unfinalized_metrics(),
+        collections.OrderedDict(
+            loss=[0, 0],
+            mean_squared_error=[0, 0],
+            root_mean_squared_error=[0, 0],
+        ),
+    )
+
+  def test_tff_model_from_functional_resets_metrics_keras3(self):
+    dataset = create_test_dataset()
+    input_spec = dataset.element_spec
+    functional_model = functional.FunctionalModel(
+        initial_weights=initial_weights(),
+        predict_on_batch_fn=predict_on_batch,
+        loss_fn=loss,
+        input_spec=input_spec,
+    )
+    metric_constructors = [
+        keras.metrics.MeanSquaredError,
+        keras.metrics.RootMeanSquaredError,
+    ]
+    tff_model = functional.model_from_functional(
+        functional_model, metric_constructors
+    )
+    optimizer = keras.optimizers.SGD(learning_rate=0.05)
 
     expected_initial_local_variables = [0.0, 0, 0.0, 0.0, 0.0, 0.0]
     self.assertSequenceEqual(
@@ -726,10 +1022,78 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
     y_spec = tf.TensorSpec([None, 1], dtype=tf.int32)
     functional_model = functional.functional_model_from_keras(
         keras_model=keras_model,
-        loss_fn=tf.keras.losses.MeanSquaredError(),
+        loss_fn=tf_keras.losses.MeanSquaredError(),
         input_spec=(x_spec, y_spec),
         metrics_constructor=collections.OrderedDict(
-            accuracy=tf.keras.metrics.MeanSquaredError
+            accuracy=tf_keras.metrics.MeanSquaredError
+        ),
+    )
+    self.assertIsInstance(functional_model, functional.FunctionalModel)
+
+    model_weights_tensor_spec = tf.nest.map_structure(
+        lambda n: tf.TensorSpec(n.shape, tf.dtypes.as_dtype(n.dtype)),
+        functional_model.initial_weights,
+    )
+    with tf.Graph().as_default():
+      metrics_state_tensor_spec = tf.nest.map_structure(
+          tf.TensorSpec.from_tensor, functional_model.initialize_metrics_state()
+      )
+      predict_on_batch_concrete_structured_fn = tf.function(
+          functional_model.predict_on_batch
+      ).get_concrete_function(
+          model_weights=model_weights_tensor_spec,
+          x=x_spec,
+          training=True,
+      )
+      batch_output_tensor_spec_structure = tf.nest.map_structure(
+          tf.TensorSpec.from_tensor,
+          predict_on_batch_concrete_structured_fn.structured_outputs,
+      )
+      self.assert_variableless_function(
+          functional_model.predict_on_batch,
+          model_weights=model_weights_tensor_spec,
+          x=x_spec,
+      )
+      self.assert_variableless_function(
+          tf.function(functional_model.loss),
+          output=batch_output_tensor_spec_structure,
+          label=y_spec,
+      )
+      self.assert_variableless_function(
+          functional_model.initialize_metrics_state
+      )
+      self.assert_variableless_function(
+          functional_model.update_metrics_state,
+          state=metrics_state_tensor_spec,
+          labels=tf.TensorSpec([1], tf.float32),
+          batch_output=variable.BatchOutput(
+              predictions=tf.TensorSpec([1], tf.float32)
+          ),
+      )
+      self.assert_variableless_function(
+          functional_model.finalize_metrics, state=metrics_state_tensor_spec
+      )
+    # Assert all ones, instead of zeros from a newly initial model.
+    tf.nest.map_structure(
+        lambda v: self.assertAllClose(v, tf.ones_like(v)),
+        functional_model.initial_weights,
+    )
+
+  def test_construct_from_keras3(self):
+    keras_model = create_test_keras3_model()
+    # Assign some variables after initialization so we can assert that they
+    # were cloned into the FunctionalModel.
+    tf.nest.map_structure(
+        lambda v: v.assign(tf.ones_like(v)), keras_model.variables
+    )
+    x_spec = tf.TensorSpec([None, 1], dtype=tf.float32)
+    y_spec = tf.TensorSpec([None, 1], dtype=tf.int32)
+    functional_model = functional.functional_model_from_keras(
+        keras_model=keras_model,
+        loss_fn=keras.losses.MeanSquaredError(),
+        input_spec=(x_spec, y_spec),
+        metrics_constructor=collections.OrderedDict(
+            accuracy=keras.metrics.MeanSquaredError
         ),
     )
     self.assertIsInstance(functional_model, functional.FunctionalModel)
@@ -788,7 +1152,26 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
     example_batch = next(iter(dataset))
     functional_model = functional.functional_model_from_keras(
         keras_model=create_test_keras_model(),
-        loss_fn=tf.keras.losses.MeanSquaredError(),
+        loss_fn=tf_keras.losses.MeanSquaredError(),
+        input_spec=(
+            tf.TensorSpec([None, 1], dtype=tf.float32),
+            tf.TensorSpec([None, 1], dtype=tf.int32),
+        ),
+    )
+    with self.assertRaisesRegex(
+        functional.KerasFunctionalModelError,
+        'only usable inside a `tff.tensorflow.computation`',
+    ):
+      functional_model.predict_on_batch(
+          functional_model.initial_weights, example_batch[0]
+      )
+
+  def test_predict_on_batch_keras3_outside_graph_fails(self):
+    dataset = create_test_dataset()
+    example_batch = next(iter(dataset))
+    functional_model = functional.functional_model_from_keras(
+        keras_model=create_test_keras3_model(),
+        loss_fn=keras.losses.MeanSquaredError(),
         input_spec=(
             tf.TensorSpec([None, 1], dtype=tf.float32),
             tf.TensorSpec([None, 1], dtype=tf.int32),
@@ -839,10 +1222,47 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
         functional.FunctionalModel,
     )
 
+  def test_keras3_model_with_non_none_sample_weights_fails(self):
+    keras_model = create_test_keras3_model()
+
+    def loss_fn_with_non_none_sample_weight(y_true, y_pred, sample_weight=2.0):
+      return (
+          tf.math.reduce_sum(tf.math.pow(y_pred - y_true, 2.0)) * sample_weight
+      )
+
+    with self.assertRaisesRegex(
+        functional.KerasFunctionalModelError,
+        'non-None model_weight',
+    ):
+      functional.functional_model_from_keras(
+          keras_model=keras_model,
+          loss_fn=loss_fn_with_non_none_sample_weight,
+          input_spec=(
+              tf.TensorSpec(shape=[None, 1]),
+              tf.TensorSpec(shape=[None, 1]),
+          ),
+      )
+
+    def loss_fn_with_none_sample_weight(y_true, y_pred, sample_weight=None):
+      del sample_weight
+      return tf.math.reduce_sum(tf.math.pow(y_pred - y_true, 2.0))
+
+    self.assertIsInstance(
+        functional.functional_model_from_keras(
+            keras_model=keras_model,
+            loss_fn=loss_fn_with_none_sample_weight,
+            input_spec=(
+                tf.TensorSpec(shape=[None, 1]),
+                tf.TensorSpec(shape=[None, 1]),
+            ),
+        ),
+        functional.FunctionalModel,
+    )
+
   def test_construct_from_keras_converges(self):
     functional_model = functional.functional_model_from_keras(
         keras_model=create_test_keras_model(),
-        loss_fn=tf.keras.losses.MeanSquaredError(),
+        loss_fn=tf_keras.losses.MeanSquaredError(),
         input_spec=(
             tf.TensorSpec([None, 1], dtype=tf.float32),
             tf.TensorSpec([None, 1], dtype=tf.int32),
@@ -863,7 +1283,67 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
         variables = tf.nest.map_structure(
             tf.Variable, functional_model.initial_weights
         )
-        optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+        optimizer = tf_keras.optimizers.SGD(learning_rate=0.01)
+
+        @tf.function
+        def train():
+          weights = tf.nest.map_structure(lambda v: v.read_value(), variables)
+          batch_input = next(iter(dataset))
+          batch_output = functional_model.predict_on_batch(
+              weights, batch_input[0], training=True
+          )
+          initial_loss = loss_value = functional_model.loss(
+              batch_output, batch_input[1]
+          )
+          trainable = variables[0]
+          for batch in dataset.repeat(30):
+            with tf.GradientTape() as tape:
+              weights = tf.nest.map_structure(
+                  lambda v: v.read_value(), variables
+              )
+              tape.watch(weights[0])
+              batch_output = functional_model.predict_on_batch(
+                  weights, batch[0], training=True
+              )
+              batch_loss = functional_model.loss(batch_output, batch[1])
+            gradients = tape.gradient(batch_loss, weights[0])
+            optimizer.apply_gradients(zip(gradients, trainable))
+            loss_value = batch_loss
+          return initial_loss, loss_value
+
+        initial_loss, final_loss = train()
+    with tf.compat.v1.Session(graph=test_graph) as sess:
+      sess.run(tf.compat.v1.initializers.variables(captured_variables))
+      initial_loss, final_loss = sess.run([initial_loss, final_loss])
+    # Expect some amount of convergence after a few epochs of the dataset.
+    self.assertGreater(initial_loss, 2.0)
+    self.assertLess(final_loss, 0.2)
+
+  def test_construct_from_keras3_converges(self):
+    functional_model = functional.functional_model_from_keras(
+        keras_model=create_test_keras3_model(),
+        loss_fn=keras.losses.MeanSquaredError(),
+        input_spec=(
+            tf.TensorSpec([None, 1], dtype=tf.float32),
+            tf.TensorSpec([None, 1], dtype=tf.int32),
+        ),
+    )
+    with tf.Graph().as_default() as test_graph:
+      # Capture all the variables for later initialization in the session,
+      # otherwise it's hard to get our hands on the Keras-owned variables.
+      variable_creation_scope = variable_utils.record_variable_creation_scope()
+      with variable_creation_scope as captured_variables:
+        # Create data satisfying y = 2*x + 1
+        dataset = tf.data.Dataset.from_tensor_slices((
+            # Features
+            [[1.0], [2.0], [3.0]],
+            # Labels.
+            [[3.0], [5.0], [7.0]],
+        )).batch(1)
+        variables = tf.nest.map_structure(
+            tf.Variable, functional_model.initial_weights
+        )
+        optimizer = keras.optimizers.SGD(learning_rate=0.01)
 
         @tf.function
         def train():
@@ -900,14 +1380,35 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
     self.assertLess(final_loss, 0.2)
 
   def test_keras_model_with_non_trainable_variables(self):
-    inputs = tf.keras.layers.Input(shape=[1])
-    d = tf.keras.layers.Dense(1)
+    inputs = tf_keras.layers.Input(shape=[1])
+    d = tf_keras.layers.Dense(1)
     d.trainable = False
     outputs = d(inputs)
-    keras_model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    keras_model = tf_keras.Model(inputs=inputs, outputs=outputs)
     functional_model = functional.functional_model_from_keras(
         keras_model,
-        tf.keras.losses.MeanSquaredError(),
+        tf_keras.losses.MeanSquaredError(),
+        input_spec=(
+            tf.TensorSpec(shape=[None, 1]),
+            tf.TensorSpec(shape=[None, 1]),
+        ),
+    )
+    self.assertEmpty(functional_model.initial_weights[0])
+    self.assertLen(
+        functional_model.initial_weights[1],
+        2,
+        msg='We expect two variables, one for the kernel and one for the bias.',
+    )
+
+  def test_keras3_model_with_non_trainable_variables(self):
+    inputs = keras.layers.Input(shape=(1, ))
+    d = keras.layers.Dense(1)
+    d.trainable = False
+    outputs = d(inputs)
+    keras_model = keras.Model(inputs=inputs, outputs=outputs)
+    functional_model = functional.functional_model_from_keras(
+        keras_model,
+        keras.losses.MeanSquaredError(),
         input_spec=(
             tf.TensorSpec(shape=[None, 1]),
             tf.TensorSpec(shape=[None, 1]),
@@ -921,16 +1422,33 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
     )
 
   def test_keras_model_with_batch_normalization_fails(self):
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=[10]),
-        tf.keras.layers.BatchNormalization(),
+    model = tf_keras.models.Sequential([
+        tf_keras.layers.InputLayer(input_shape=[10]),
+        tf_keras.layers.BatchNormalization(),
     ])
     with self.assertRaisesRegex(
         functional.KerasFunctionalModelError, 'batch normalization'
     ):
       functional.functional_model_from_keras(
           model,
-          tf.keras.losses.MeanSquaredError(),
+          tf_keras.losses.MeanSquaredError(),
+          input_spec=(
+              tf.TensorSpec(shape=[None, 10]),
+              tf.TensorSpec(shape=[None, 1]),
+          ),
+      )
+
+  def test_keras3_model_with_batch_normalization_fails(self):
+    model = keras.models.Sequential([
+        keras.layers.Input(shape=(10, )),
+        keras.layers.BatchNormalization(),
+    ])
+    with self.assertRaisesRegex(
+        functional.KerasFunctionalModelError, 'batch normalization'
+    ):
+      functional.functional_model_from_keras(
+          model,
+          keras.losses.MeanSquaredError(),
           input_spec=(
               tf.TensorSpec(shape=[None, 10]),
               tf.TensorSpec(shape=[None, 1]),
@@ -938,9 +1456,9 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
       )
 
   def test_keras_layer_capturing_other_layer_fails(self):
-    class SharedLayer(tf.keras.layers.Layer):
+    class SharedLayer(tf_keras.layers.Layer):
 
-      def __init__(self, dense_layer: tf.keras.layers.Dense, **kwargs):
+      def __init__(self, dense_layer: tf_keras.layers.Dense, **kwargs):
         super().__init__(**kwargs)
         self._dense_layer = dense_layer
         self.kernel = dense_layer.kernel
@@ -954,19 +1472,55 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
         config.update({'dense_layer': self._dense_layer})
         return config
 
-    inputs = tf.keras.layers.Input(shape=[1])
-    layer1 = tf.keras.layers.Dense(1)
+    inputs = tf_keras.layers.Input(shape=[1])
+    layer1 = tf_keras.layers.Dense(1)
     y = layer1(inputs)
     layer2 = SharedLayer(layer1)
     outputs = layer2(y)
-    keras_model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    keras_model = tf_keras.Model(inputs=inputs, outputs=outputs)
 
     with self.assertRaisesRegex(
         functional.KerasFunctionalModelError, 'sharing variables across layers'
     ):
       functional.functional_model_from_keras(
           keras_model,
-          tf.keras.losses.MeanSquaredError(),
+          tf_keras.losses.MeanSquaredError(),
+          input_spec=(
+              tf.TensorSpec(shape=[None, 1]),
+              tf.TensorSpec(shape=[None, 1]),
+          ),
+      )
+
+  def test_keras3_layer_capturing_other_layer_fails(self):
+    class SharedLayer(keras.layers.Layer):
+
+      def __init__(self, dense_layer: keras.layers.Dense, **kwargs):
+        super().__init__(**kwargs)
+        self._dense_layer = dense_layer
+        self.kernel = dense_layer.kernel
+        self.bias = dense_layer.bias
+
+      def call(self, inputs):
+        return inputs
+
+      def get_config(self):
+        config = super().get_config()
+        config.update({'dense_layer': self._dense_layer})
+        return config
+
+    inputs = keras.layers.Input(shape=[1])
+    layer1 = keras.layers.Dense(1)
+    y = layer1(inputs)
+    layer2 = SharedLayer(layer1)
+    outputs = layer2(y)
+    keras_model = keras.Model(inputs=inputs, outputs=outputs)
+
+    with self.assertRaisesRegex(
+        functional.KerasFunctionalModelError, 'sharing variables across layers'
+    ):
+      functional.functional_model_from_keras(
+          keras_model,
+          keras.losses.MeanSquaredError(),
           input_spec=(
               tf.TensorSpec(shape=[None, 1]),
               tf.TensorSpec(shape=[None, 1]),
@@ -978,20 +1532,20 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
     # instead of passing the layer in the construction, it takes the other
     # layer as an input to `call`.
 
-    class SharedLayer(tf.keras.layers.Layer):
+    class SharedLayer(tf_keras.layers.Layer):
 
       def call(
-          self, inputs: tf.Tensor, dense_layer: tf.keras.layers.Dense
+          self, inputs: tf.Tensor, dense_layer: tf_keras.layers.Dense
       ) -> tf.Tensor:
         return inputs @ dense_layer.kernel + dense_layer.bias
 
     def create_test_model():
-      inputs = tf.keras.layers.Input(shape=[1])
-      layer1 = tf.keras.layers.Dense(1)
+      inputs = tf_keras.layers.Input(shape=[1])
+      layer1 = tf_keras.layers.Dense(1)
       y = layer1(inputs)
       layer2 = SharedLayer()
       outputs = layer2(y, layer1)
-      return tf.keras.Model(inputs=inputs, outputs=outputs)
+      return tf_keras.Model(inputs=inputs, outputs=outputs)
 
     with self.assertRaisesRegex(
         functional.KerasFunctionalModelError,
@@ -999,7 +1553,7 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
     ):
       functional.functional_model_from_keras(
           create_test_model(),
-          tf.keras.losses.MeanSquaredError(),
+          tf_keras.losses.MeanSquaredError(),
           input_spec=(
               tf.TensorSpec(shape=[None, 1]),
               tf.TensorSpec(shape=[None, 1]),
@@ -1007,7 +1561,50 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
       )
     functional.functional_model_from_keras(
         create_test_model,
-        tf.keras.losses.MeanSquaredError(),
+        tf_keras.losses.MeanSquaredError(),
+        input_spec=(
+            tf.TensorSpec(shape=[None, 1]),
+            tf.TensorSpec(shape=[None, 1]),
+        ),
+    )
+
+  #TODO DisableSharedObjectScope is no longer used in keras 3 while cloning the model, does it matter?
+  @absl.testing.absltest.skip("Unusual behaviour from keras 3 layer tracking")
+  def test_keras3_layer_input_other_layer_fails(self):
+    # A variant of test_keras_layer_capturing_other_layer_fails, but
+    # instead of passing the layer in the construction, it takes the other
+    # layer as an input to `call`.
+    class SharedLayer(keras.layers.Layer):
+
+      @tf.function()
+      def call(
+          self, inputs: tf.Tensor, dense_layer: keras.layers.Dense
+      ) -> tf.Tensor:
+        return inputs @ dense_layer.kernel + dense_layer.bias
+
+    def create_test_model():
+      inputs = keras.layers.Input(shape=(1, ))
+      layer1 = keras.layers.Dense(1)
+      y = layer1(inputs)
+      layer2 = SharedLayer()
+      outputs = layer2(inputs=y, dense_layer=layer1)
+      return keras.Model(inputs=inputs, outputs=outputs)
+
+    with self.assertRaisesRegex(
+        functional.KerasFunctionalModelError,
+        'has a layer that receives inputs from other layers directly',
+    ):
+      functional.functional_model_from_keras(
+          create_test_model(),
+          keras.losses.MeanSquaredError(),
+          input_spec=(
+              tf.TensorSpec(shape=[None, 1]),
+              tf.TensorSpec(shape=[None, 1]),
+          ),
+      )
+    functional.functional_model_from_keras(
+        create_test_model,
+        keras.losses.MeanSquaredError(),
         input_spec=(
             tf.TensorSpec(shape=[None, 1]),
             tf.TensorSpec(shape=[None, 1]),
@@ -1018,15 +1615,15 @@ class FunctionalModelFromKerasTest(tf.test.TestCase):
 class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
 
   def test_keras_model_created_in_graph(self):
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=[3]),
-        tf.keras.layers.BatchNormalization(
+    model = tf_keras.models.Sequential([
+        tf_keras.layers.InputLayer(input_shape=[3]),
+        tf_keras.layers.BatchNormalization(
             beta_initializer='zeros',
             gamma_initializer='zeros',
             moving_mean_initializer='zeros',
             moving_variance_initializer='zeros',
         ),
-        tf.keras.layers.Dense(
+        tf_keras.layers.Dense(
             1, kernel_initializer='zeros', bias_initializer='zeros'
         ),
     ])
@@ -1073,10 +1670,81 @@ class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
           ),
       )
 
+  def test_keras3_model_created_in_graph(self):
+    model = keras.models.Sequential([
+        keras.layers.Input(shape=(3, )),
+        keras.layers.BatchNormalization(
+            beta_initializer='zeros',
+            gamma_initializer='zeros',
+            moving_mean_initializer='zeros',
+            moving_variance_initializer='zeros',
+        ),
+        keras.layers.Dense(
+            1, kernel_initializer='zeros', bias_initializer='zeros'
+        ),
+    ])
+    # Assert the initial variables are all zero.
+    self.assertAllClose(
+        model.variables, tf.nest.map_structure(tf.zeros_like, model.variables)
+    )
+    trainable_weights = (
+        # Batch norm: gamma, beta
+        np.ones(shape=[3]) * 1.0,
+        np.ones(shape=[3]) * 1.0,
+        # Dense: kernel, bias
+        np.ones(shape=[3, 1]) * 2.0,
+        np.ones(shape=[1]) * 2.0,
+    )
+    non_trainable_weights = (
+        # Batch norm: moving_mean, moving_variance
+        np.ones(shape=[3]) * 3.0,
+        np.ones(shape=[3]) * 3.0,
+    )
+    weights = (trainable_weights, non_trainable_weights)
+    # Now create a new keras model using the structure with model weights that
+    # are all twos.
+    with tf.Graph().as_default() as g:
+      new_model = functional.keras_model_from_functional_weights(
+          model_weights=weights, keras_model=model
+      )
+      expected_variables = [
+      # Batch norm: gamma, beta, moving_mean, moving_variance
+      np.ones(shape=[3]) * 1.0,
+      np.ones(shape=[3]) * 1.0,
+      np.ones(shape=[3]) * 3.0,
+      np.ones(shape=[3]) * 3.0,
+      # Dense: kernel, bias
+      np.ones(shape=[3, 1]) * 2.0,
+      np.ones(shape=[1]) * 2.0,
+      ]
+      with tf.compat.v1.Session() as sess:
+        sess.run(tf.compat.v1.global_variables_initializer())
+        for i, expected in enumerate(expected_variables):
+          variable_tensor = tf.convert_to_tensor(new_model.variables[i])
+          value = sess.run(variable_tensor)
+          np.testing.assert_allclose(value, expected, rtol=1e-05, atol=1e-08)
+
   def test_keras_model_in_eager_fails(self):
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=[3]),
-        tf.keras.layers.Dense(
+    model = tf_keras.models.Sequential([
+        tf_keras.layers.InputLayer(input_shape=[3]),
+        tf_keras.layers.Dense(
+            1, kernel_initializer='zeros', bias_initializer='zeros'
+        ),
+    ])
+    trainable_weights = (np.ones(shape=[3, 1]) * 2.0, np.ones(shape=[1]) * 2.0)
+    non_trainable_weights = ()
+    weights = (trainable_weights, non_trainable_weights)
+    with self.assertRaisesRegex(
+        ValueError, 'can only be called from within a graph context'
+    ):
+      functional.keras_model_from_functional_weights(
+          model_weights=weights, keras_model=model
+      )
+
+  def test_keras3_model_in_eager_fails(self):
+    model = keras.models.Sequential([
+        keras.layers.InputLayer(input_shape=[3]),
+        keras.layers.Dense(
             1, kernel_initializer='zeros', bias_initializer='zeros'
         ),
     ])
@@ -1091,9 +1759,25 @@ class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
       )
 
   def test_keras_model_too_few_weights_fails(self):
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=[3]),
-        tf.keras.layers.Dense(
+    model = tf_keras.models.Sequential([
+        tf_keras.layers.InputLayer(input_shape=[3]),
+        tf_keras.layers.Dense(
+            1, kernel_initializer='zeros', bias_initializer='zeros'
+        ),
+    ])
+    trainable_weights = (np.ones(shape=[3, 1]) * 2.0,)
+    non_trainable_weights = ()
+    weights = (trainable_weights, non_trainable_weights)
+    with tf.Graph().as_default():
+      with self.assertRaisesRegex(ValueError, 'contains fewer weights'):
+        functional.keras_model_from_functional_weights(
+            model_weights=weights, keras_model=model
+        )
+
+  def test_keras3_model_too_few_weights_fails(self):
+    model = keras.models.Sequential([
+        keras.layers.InputLayer(input_shape=[3]),
+        keras.layers.Dense(
             1, kernel_initializer='zeros', bias_initializer='zeros'
         ),
     ])
@@ -1107,9 +1791,29 @@ class KerasModelFromFunctionalWeightsTest(tf.test.TestCase):
         )
 
   def test_keras_model_too_many_weights_fails(self):
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=[3]),
-        tf.keras.layers.Dense(
+    model = tf_keras.models.Sequential([
+        tf_keras.layers.InputLayer(input_shape=[3]),
+        tf_keras.layers.Dense(
+            1, kernel_initializer='zeros', bias_initializer='zeros'
+        ),
+    ])
+    trainable_weights = (
+        np.ones(shape=[3, 1]) * 2.0,
+        np.ones(shape=[1]) * 2.0,
+        np.ones(shape=[3, 1]) * 2.0,
+    )
+    non_trainable_weights = ()
+    weights = (trainable_weights, non_trainable_weights)
+    with tf.Graph().as_default():
+      with self.assertRaisesRegex(ValueError, 'contained more variables'):
+        functional.keras_model_from_functional_weights(
+            model_weights=weights, keras_model=model
+        )
+
+  def test_keras3_model_too_many_weights_fails(self):
+    model = keras.models.Sequential([
+        keras.layers.InputLayer(input_shape=[3]),
+        keras.layers.Dense(
             1, kernel_initializer='zeros', bias_initializer='zeros'
         ),
     ])

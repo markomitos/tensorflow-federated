@@ -18,6 +18,8 @@ from collections.abc import Callable
 from typing import Any, Optional, Union
 
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
 from tensorflow_federated.python.core.impl.federated_context import federated_computation
@@ -101,7 +103,7 @@ def _build_tff_optimizer_initialize_and_next(
 
 def _build_keras_optimizer_initialize_and_next(
     model_weights_type: computation_types.Type,
-    optimizer_fn: Callable[[], tf.keras.optimizers.Optimizer],
+    optimizer_fn: Union [Callable[[], tf_keras.optimizers.Optimizer], Callable[[], keras.optimizers.Optimizer]],
     should_reject_update: Callable[
         [Any, Any], tuple[Union[bool, tf.Tensor], Optional[_MeasurementsType]]
     ],
@@ -164,7 +166,7 @@ def _build_keras_optimizer_initialize_and_next(
 
 def build_apply_optimizer_finalizer(
     optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer, Callable[[], tf_keras.optimizers.Optimizer], Callable[[], keras.optimizers.Optimizer]
     ],
     model_weights_type: computation_types.StructType,
     should_reject_update: Callable[
@@ -186,8 +188,8 @@ def build_apply_optimizer_finalizer(
 
   Args:
     optimizer_fn: A `tff.learning.optimizers.Optimizer` or a no-arg function
-      that returns a `tf.keras.optimizers.Optimizer`. This optimizer is used to
-      apply client updates to the server model.
+      that returns a `tf_keras.optimizers.Optimizer` or a `keras.optimizers.Optimizer`.
+      This optimizer is used to apply client updates to the server model.
     model_weights_type: A non-federated `tff.Type` of the model weights to be
       optimized, which must have a `tff.learning.models.ModelWeights` container.
     should_reject_update: A callable that takes the optimizer state and the
@@ -211,14 +213,16 @@ def build_apply_optimizer_finalizer(
     if not callable(optimizer_fn) or not isinstance(
         optimizer_fn(),
         (
-            tf.keras.optimizers.Optimizer,
-            tf.keras.optimizers.legacy.Optimizer,
-            tf.keras.optimizers.experimental.Optimizer,
+            tf_keras.optimizers.Optimizer,
+            tf_keras.optimizers.legacy.Optimizer,
+            tf_keras.optimizers.experimental.Optimizer,
+            keras.optimizers.Optimizer,
         ),
     ):
       raise TypeError(
           'The optimizer_fn must be a `tff.learning.optimizers.Optimizer`, or '
-          'a no-arg callable returning a `tf.keras.optimizers.Optimizer`. Got: '
+          'a no-arg callable returning a `tf_keras.optimizers.Optimizer` or a '
+          '`keras.optimizers.Optimizer`. Got: '
           f'{type(optimizer_fn)=}'
       )
 

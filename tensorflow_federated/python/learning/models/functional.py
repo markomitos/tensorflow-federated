@@ -30,16 +30,17 @@ from collections.abc import Callable, Mapping, Sequence
 import inspect
 from typing import Any, Optional, TypeVar, Union
 
+import keras
 import numpy as np
 import tensorflow as tf
+import tf_keras
 
-from tensorflow_federated.python.common_libs import py_typecheck
+from tensorflow_federated.python.common_libs import py_typecheck, keras_compat
 from tensorflow_federated.python.learning.metrics import keras_finalizer
 from tensorflow_federated.python.learning.metrics import keras_utils
 from tensorflow_federated.python.learning.metrics import types
 from tensorflow_federated.python.learning.models import variable
 from tensorflow_federated.python.tensorflow_libs import variable_utils
-
 
 Weight = Union[np.ndarray, int, float]
 WeightStruct = Union[Sequence[Weight], Mapping[str, Weight]]
@@ -241,7 +242,7 @@ class _ModelFromFunctional(variable.VariableModel):
   def __init__(
       self,
       functional_model: FunctionalModel,
-      metric_builders: Sequence[Callable[[], tf.keras.metrics.Metric]] = (),
+      metric_builders: Sequence[Callable[[], tf_keras.metrics.Metric]] = (),
   ):
     self._functional_model = functional_model
     # Construct `tf.Variable` to optimize during the learning process.
@@ -301,7 +302,7 @@ class _ModelFromFunctional(variable.VariableModel):
       x, y = batch_input
     batch_output = self._functional_model.predict_on_batch(
         model_weights=tf.nest.map_structure(
-            lambda v: v.read_value(), self._model_weights
+            lambda v: v.value if keras_compat.is_keras3(v) else v.read_value(), self._model_weights
         ),
         x=x,
         training=training,
@@ -326,7 +327,7 @@ class _ModelFromFunctional(variable.VariableModel):
   def predict_on_batch(self, x, training=True):
     return self._functional_model.predict_on_batch(
         model_weights=tf.nest.map_structure(
-            lambda v: v.read_value(), self._model_weights
+            lambda v: v.value if keras_compat.is_keras3(v) else v.read_value(), self._model_weights
         ),
         x=x,
         training=training,
@@ -340,7 +341,7 @@ class _ModelFromFunctional(variable.VariableModel):
         loss=[self._loss_sum, tf.cast(self._num_examples, tf.float32)]
     )
     for metric in self._metrics:
-      outputs[metric.name] = [v.read_value() for v in metric.variables]
+      outputs[metric.name] = [v.value if keras_compat.is_keras3(v) else v.read_value() for v in metric.variables]
     return outputs
 
   def metric_finalizers(
@@ -368,7 +369,7 @@ class _ModelFromFunctional(variable.VariableModel):
 
 def model_from_functional(
     functional_model: FunctionalModel,
-    metric_constructors: Sequence[Callable[[], tf.keras.metrics.Metric]] = (),
+    metric_constructors: Sequence[Callable[[], tf_keras.metrics.Metric]] = (),
 ) -> variable.VariableModel:
   """Converts a `FunctionalModel` to a `tff.learning.models.VariableModel`.
 
@@ -378,7 +379,7 @@ def model_from_functional(
   Args:
       functional_model: A `tff.learning.models.FunctionalModel` to convert.
       metric_constructors: An optional sequence of callables that return newly
-        constructed `tf.keras.metrics.Metric` objects to attached to the output
+        constructed `tf_keras.metrics.Metric` objects to attached to the output
         `tff.learning.models.VariableModel`.
 
   Returns:
@@ -393,18 +394,20 @@ class KerasFunctionalModelError(Exception):
 
 
 def functional_model_from_keras(
-    keras_model: Union[tf.keras.Model, Callable[[], tf.keras.Model]],
-    loss_fn: tf.keras.losses.Loss,
+    keras_model: Union[tf_keras.Model, Callable[[], tf_keras.Model], keras.Model, Callable[[], keras.Model]],
+    loss_fn: Union[tf_keras.losses.Loss, keras.losses.Loss],
     input_spec: Union[Sequence[Any], Mapping[str, Any]],
     metrics_constructor: Optional[
         Union[
             keras_utils.MetricConstructor,
             keras_utils.MetricsConstructor,
             keras_utils.MetricConstructors,
+            keras_utils.Keras3MetricConstructor,
+            keras_utils.Keras3MetricConstructors,
         ]
     ] = None,
 ) -> FunctionalModel:
-  """Converts a `tf.keras.Model` to a `tff.learning.models.FunctionalModel`.
+  """Converts a `tf_keras.Model` or `keras.Model` to a `tff.learning.models.FunctionalModel`.
 
   NOTE: This method only supports models where calling that model with
   `training=True` and `training=False` produce the same graph. Keras layers
@@ -420,10 +423,10 @@ def functional_model_from_keras(
   raise an error otherwise.
 
   Args:
-    keras_model: A `tf.keras.Model` object, should be uncompiled. If compiled,
+    keras_model: A `tf_keras.Model` or `keras.Model` object, should be uncompiled. If compiled,
       the metrics, optimizer, and loss function will be ignored. Note: models
       that have multiple outputs will send all outputs to the `loss_fn`.
-    loss_fn: A `tf.keras.losses.Loss` object.
+    loss_fn: A `tf_keras.losses.Loss` object.
     input_spec: A structure of `tf.TensorSpec` defining the input to the model.
     metrics_constructor: An optional callable that must be compatible with
       `tff.learning.metrics.create_functional_metric_fns`.
@@ -447,7 +450,7 @@ def functional_model_from_keras(
   # 2. Use this ordering to construct a type signature of the model weights in
   #    such a way that we can inject TENSORS (those that are coming in as
   #    arguments) in place of variable creation during a call to
-  #    `tf.keras.models.clone_model()`, which gives us a newly constructed Keras
+  #    `tf_keras.models.clone_model()`, which gives us a newly constructed Keras
   #    model in the context we want.
   # 3. Profit by having variableless graphs!
   #
@@ -467,11 +470,11 @@ def functional_model_from_keras(
   #
   # 3. This does not support multiple outputs with different loss functions, or
   #    laywerise regularization losses TODO: b/156629927.
-  if isinstance(keras_model, tf.keras.Model):
+  if isinstance(keras_model, (tf_keras.Model, keras.Model)):
     for layer in keras_model.layers:
       # There may be other layers that are problematic, at this time updating
       # the mean/variance in batchnorm layer is the only known such instance.
-      if isinstance(layer, tf.keras.layers.BatchNormalization):
+      if isinstance(layer, (tf_keras.layers.BatchNormalization, keras.layers.BatchNormalization)):
         raise KerasFunctionalModelError(
             'Keras model contains a batch normalization layer, which is '
             'incompatible with `tff.learning.models.FunctionalModel`. Consider '
@@ -479,8 +482,8 @@ def functional_model_from_keras(
         )
   elif not callable(keras_model):
     raise ValueError(
-        '`keras_model` must be a `tf.keras.Model` or a no-arg '
-        'callable that returns a `tf.keras.Model`.'
+        '`keras_model` must be a `tf_keras.Model`, `keras.Model` or a no-arg '
+        'callable that returns a `tf_keras.Model` or `keras.Model.'
     )
 
   # TODO: b/269671316 - more work needed to support non-None sample_weight
@@ -500,15 +503,15 @@ def functional_model_from_keras(
   # will be re-initialized from scratch.
   with tf.Graph().as_default() as g:
     with variable_utils.record_variable_creation_scope() as captured_variables:
-      if isinstance(keras_model, tf.keras.Model):
+      if isinstance(keras_model, (tf_keras.Model, keras.Model)):
         try:
-          cloned_model = tf.keras.models.clone_model(keras_model)
+          cloned_model = keras_compat.clone_model(keras_model)
         except RuntimeError as e:
           raise KerasFunctionalModelError(
               'Encountered a error converting the Keras model. Often this '
-              'occurs when the `tf.keras.Model` has a layer that receives '
+              'occurs when the `tf_keras.Model` has a layer that receives '
               'inputs from other layers directly (e.g. shared embeddings).'
-              'To avoid the problem, wrap the `tf.keras.Model` construction in '
+              'To avoid the problem, wrap the `tf_keras.Model` construction in '
               'a no-arg callable (e.g. lambda) and pass that callable to '
               '`functional_model_from_keras`'
           ) from e
@@ -525,32 +528,34 @@ def functional_model_from_keras(
       # We'll feed in the current model waits into the palceholders for
       # assignmnet in a session below.
       def assign_placeholder(v):
-        p = tf.compat.v1.placeholder(dtype=v.dtype)
+        p = tf.compat.v1.placeholder(dtype=keras_compat.keras_dtype_to_tf(v.dtype), shape=v.shape)
         return v.assign(p), p
 
       assign_ops, placeholders = zip(
-          *(assign_placeholder(v) for v in cloned_model.variables)
-      )
+          *(assign_placeholder(v) for v in keras_compat.get_variables(cloned_model.variables))
+          )
 
     trainable_variables = tuple(
-        v for v in captured_variables if v in cloned_model.trainable_variables
+        v for v in captured_variables if keras_compat.get_variable(v) in keras_compat.get_variables(cloned_model.trainable_variables)
     )
     non_trainable_variables = tuple(
         v
         for v in captured_variables
-        if v in cloned_model.non_trainable_variables
+        if v in keras_compat.get_variables(cloned_model.non_trainable_variables)
     )
 
   # Here we get the initial weights from the incoming keras model in the order
   # they are constructed; and also ensure that the values are set to the
   # incoming model weights rather than their fresh initialization.
-  if isinstance(keras_model, tf.keras.Model):
+  if isinstance(keras_model, (tf_keras.Model, keras.Model)):
     model_for_variables = keras_model
   else:
     model_for_variables = keras_model()
   current_model_weights = tf.nest.map_structure(
-      lambda v: v.read_value().numpy(), model_for_variables.variables
+    lambda v: keras_compat.get_variable(v).numpy(),
+    model_for_variables.variables
   )
+
   with tf.compat.v1.Session(graph=g) as sess:
     sess.run(tf.compat.v1.initializers.variables(captured_variables))
     sess.run(
@@ -568,7 +573,7 @@ def functional_model_from_keras(
     with tf.init_scope():
       if tf.executing_eagerly():
         raise KerasFunctionalModelError(
-            '`tf.keras.Model` used as a `FunctionalModel` is only usable inside'
+            '`tf_keras.Model` used as a `FunctionalModel` is only usable inside'
             ' a `tff.tensorflow.computation` decorated callable or a graph'
             ' context.'
         )
@@ -577,7 +582,7 @@ def functional_model_from_keras(
     trainable, non_trainable = (list(w) for w in model_weights)
 
     # Here were intercept variable creation requests during the
-    # `tf.keras.models.clone_model()` call.
+    # `tf_keras.models.clone_model()` call.
     #
     # Instead of forwarding the variable request to TF core and getting a
     # `tf.Variable` back, we skip that and return only the `tf.Tensor` that
@@ -611,11 +616,11 @@ def functional_model_from_keras(
         return non_trainable.pop(0)
 
     with tf.variable_creator_scope(swap_tensor_parameter_for_variable):
-      if isinstance(keras_model, tf.keras.Model):
-        variableless_model = tf.keras.models.clone_model(keras_model)
+      if keras_compat.is_keras3(keras_model):
+        variableless_model = keras.models.clone_model(keras_model)
       else:
-        variableless_model = keras_model()
-    return variableless_model(x, training)
+        variableless_model = tf_keras.models.clone_model(keras_model)
+    return variableless_model(x, training=training)
 
   def loss(
       output: Any, label: Any, sample_weight: Optional[Any] = None
@@ -641,8 +646,8 @@ def functional_model_from_keras(
 
 
 def keras_model_from_functional_weights(
-    *, model_weights: ModelWeights, keras_model: tf.keras.Model
-) -> tf.keras.Model:
+    *, model_weights: ModelWeights, keras_model: Union[tf_keras.Model, keras.Model]
+) -> tf_keras.Model:
   """Creates a new Keras model using the model weights from a `FunctionalModel`.
 
   This method is effectively the reverse of `functional_model_from_keras`. Since
@@ -662,7 +667,7 @@ def keras_model_from_functional_weights(
       weights.
 
   Returns:
-    A newly constructed `tf.keras.Model` that matches the architecture of
+    A newly constructed `tf_keras.Model` that matches the architecture of
     the input `keras_model` argument but with the weight values from
     `model_weights.
   """
@@ -698,7 +703,7 @@ def keras_model_from_functional_weights(
     return next_creator_fn(**kwargs)
 
   with tf.variable_creator_scope(variable_creator_with_weights):
-    new_model = tf.keras.models.clone_model(keras_model)
+    new_model = keras_compat.clone_model(keras_model)
   if trainable_weights or non_trainable_weights:
     raise ValueError(
         '`model_weights` contained more variables than `keras_model` uses, '

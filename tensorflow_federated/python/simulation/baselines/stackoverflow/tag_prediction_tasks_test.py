@@ -14,6 +14,7 @@
 
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.baselines import baseline_task
 from tensorflow_federated.python.simulation.baselines import client_spec
@@ -34,7 +35,7 @@ class LogisticRegressionModelTest(tf.test.TestCase, parameterized.TestCase):
     model = tag_prediction_tasks._build_logistic_regression_model(
         input_size=input_size, output_size=output_size
     )
-    self.assertIsInstance(model, tf.keras.Model)
+    self.assertIsInstance(model, tf_keras.Model)
 
     model_weights = model.weights
     self.assertLen(model_weights, 2)

@@ -14,5 +14,6 @@
 """Libraries for constructing baseline tasks for the Shakespeare dataset."""
 
 from tensorflow_federated.python.simulation.baselines.shakespeare.char_prediction_tasks import create_character_prediction_task
+from tensorflow_federated.python.simulation.baselines.shakespeare.char_prediction_tasks import create_character_prediction_task_keras3
 from tensorflow_federated.python.simulation.baselines.shakespeare.char_prediction_tasks import DEFAULT_SEQUENCE_LENGTH
 from tensorflow_federated.python.simulation.baselines.shakespeare.char_prediction_tasks import VOCAB_LENGTH

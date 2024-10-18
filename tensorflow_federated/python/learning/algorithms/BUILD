@@ -115,6 +115,7 @@ py_cpu_gpu_test(
     shard_count = 10,
     deps = [
         ":fed_avg_with_optimizer_schedule",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/core/test:static_assert",
         "//tensorflow_federated/python/learning:dataset_reduce",
         "//tensorflow_federated/python/learning:model_update_aggregator",
@@ -178,6 +179,7 @@ py_library(
         "//tensorflow_federated/python/aggregators:factory",
         "//tensorflow_federated/python/aggregators:factory_utils",
         "//tensorflow_federated/python/aggregators:mean",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/core/environments/tensorflow_frontend:tensorflow_computation",
         "//tensorflow_federated/python/core/impl/computation:computation_base",
@@ -238,6 +240,7 @@ py_library(
     deps = [
         ":fed_recon",
         "//tensorflow_federated/python/aggregators:mean",
+        "//tensorflow_federated/python/common_libs:keras_compat",
         "//tensorflow_federated/python/common_libs:py_typecheck",
         "//tensorflow_federated/python/core/environments/tensorflow_frontend:tensorflow_computation",
         "//tensorflow_federated/python/core/impl/federated_context:federated_computation",

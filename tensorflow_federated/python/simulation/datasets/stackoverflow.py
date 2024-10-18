@@ -19,6 +19,7 @@ import os.path
 from typing import Optional
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.datasets import download
 from tensorflow_federated.python.simulation.datasets import from_tensor_slices_client_data
@@ -157,7 +158,7 @@ def load_word_counts(cache_dir=None, vocab_size: Optional[int] = None):
     if vocab_size <= 0:
       raise ValueError(f'vocab_size must be positive, got {vocab_size}.')
 
-  path = tf.keras.utils.get_file(
+  path = tf_keras.utils.get_file(
       'stackoverflow.word_count.tar.bz2',
       origin='https://storage.googleapis.com/tff-datasets-public/stackoverflow.word_count.tar.bz2',
       file_hash=(
@@ -194,7 +195,7 @@ def load_tag_counts(cache_dir=None):
     set containing with that tag. The dictionary items are in decreasing order
     of tag frequency.
   """
-  path = tf.keras.utils.get_file(
+  path = tf_keras.utils.get_file(
       'stackoverflow.tag_count.tar.bz2',
       origin='https://storage.googleapis.com/tff-datasets-public/stackoverflow.tag_count.tar.bz2',
       file_hash=(

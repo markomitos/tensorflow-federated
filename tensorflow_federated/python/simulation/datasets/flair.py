@@ -37,6 +37,7 @@ import urllib.parse
 
 from absl import logging
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.datasets import client_data
 from tensorflow_federated.python.simulation.datasets import file_per_user_client_data
@@ -72,13 +73,13 @@ def download_data(data_dir: str) -> None:
   )
   metadata_path = os.path.join(data_dir, _METADATA_FILENAME)
   logging.info('Downloading metadata...')
-  tf.keras.utils.get_file(
+  tf_keras.utils.get_file(
       fname=metadata_path, origin=metadata_url, extract=False
   )
   logging.info('Finished downloading metadata.')
 
   def download_image_bucket(image_bucket_url: str) -> None:
-    tf.keras.utils.get_file(
+    tf_keras.utils.get_file(
         origin=image_bucket_url,
         extract=True,
         cache_dir=data_dir,

@@ -19,19 +19,26 @@ import functools
 from typing import Any, TypeVar, Union
 
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.tensorflow_libs import variable_utils
+from tensorflow_federated.python.common_libs import keras_compat
 
 StateVar = TypeVar('StateVar')
-MetricConstructor = Callable[[], tf.keras.metrics.Metric]
+MetricConstructor = Callable[[], tf_keras.metrics.Metric]
+Keras3MetricConstructor = Callable[[], keras.metrics.Metric]
 MetricConstructors = collections.OrderedDict[str, MetricConstructor]
-MetricStructure = collections.OrderedDict[str, tf.keras.metrics.Metric]
-MetricsConstructor = Callable[[], MetricStructure]
+Keras3MetricConstructors = collections.OrderedDict[str, Keras3MetricConstructor]
+MetricStructure = collections.OrderedDict[str, tf_keras.metrics.Metric]
+Keras3MetricStructure = collections.OrderedDict[str, keras.metrics.Metric]
+MetricsConstructor = Union[Callable[[], MetricStructure], Callable[[], Keras3MetricStructure]]
+Metrics = Union[tf_keras.metrics.Metric, keras.metrics.Metric]
 
 
 def create_functional_metric_fns(
     metrics_constructor: Union[
-        MetricConstructor, MetricsConstructor, MetricConstructors
+        Union[MetricConstructor, Keras3MetricConstructor], MetricsConstructor, Union[MetricConstructors, Keras3MetricConstructors]
     ]
 ) -> tuple[
     Callable[[], StateVar],
@@ -43,19 +50,19 @@ def create_functional_metric_fns(
   This can be used to convert Keras metrics for use in
   `tff.learning.models.FunctionalModel`. The method traces the metric logic into
   three `tf.function` with explicit `state` parameters that replace the
-  closure over internal `tf.Variable` of the `tf.keras.metrics.Metric`.
+  closure over internal `tf.Variable` of the `tf_keras.metrics.Metric` or `keras.metrics.Metric`.
 
-  IMPORTANT: Only metrics whose `tf.keras.metrics.Metric.update_state` method
+  IMPORTANT: Only metrics whose `tf_keras.metrics.Metric.update_state` or `keras.metrics.Metric.update_state` method
   take two arguments (`y_true` and `y_pred`) are supported.
 
   Example:
 
-    >>> metric = tf.keras.metrics.Accuracy()
+    >>> metric = tf_keras.metrics.Accuracy()
     >>> metric.update_state([1.0, 1.0], [0.0, 1.0])
     >>> metric.result()  # == 0.5
     >>>
     >>> metric_fns = tff.learning.metrics.create_functional_metric_fns(
-    >>>    tf.keras.metrics.Accuracy)
+    >>>    tf_keras.metrics.Accuracy)
     >>> initialize, update, finalize = metric_fns
     >>> state = initialize()
     >>> state = update(state, [1.0, 1.0], [0.0, 1.0])
@@ -63,10 +70,10 @@ def create_functional_metric_fns(
 
   Args:
     metrics_constructor: Either a no-arg callable that returns a
-      `tf.keras.metrics.Metric` or an `OrderedDict` of `str` names to
-      `tf.keras.metrics.Metric`, or `OrderedDict` of no-arg callables returning
-      `tf.keras.metrics.Metric` instances.  The no-arg callables can be the
-      metric class itself (e.g.  `tf.keras.metrics.Accuracy`) in which case the
+      `tf_keras.metrics.Metric`, `keras.metrics.Metric`, or an `OrderedDict` of `str` names to
+      `tf_keras.metrics.Metric`, `keras.metrics.Metric`, or `OrderedDict` of no-arg callables returning
+      `tf_keras.metrics.Metric`  or `keras.metrics.Metric` instances.  The no-arg callables can be the
+      metric class itself (e.g.  `tf_keras.metrics.Accuracy`) in which case the
       default metric configuration will be used. It also supports lambdas or
       `functools.partial` to provide alternate metric configurations.
 
@@ -99,9 +106,9 @@ def create_functional_metric_fns(
     # have the expected properties to provide better debugging messages to
     # caller.
     def check_keras_metric_type(obj):
-      if not isinstance(obj, tf.keras.metrics.Metric):
+      if not isinstance(obj, (tf_keras.metrics.Metric, keras.metrics.Metric)):
         raise TypeError(
-            f'Found non-tf.keras.metrics.Metric value: {type(obj)}: {obj!r}.'
+            f'Found non-tf_keras.metrics.Metric or non-keras.metrics.Metric value: {type(obj)}: {obj!r}.'
         )
 
     with tf.Graph().as_default():
@@ -109,7 +116,7 @@ def create_functional_metric_fns(
       tf.nest.map_structure(check_keras_metric_type, metrics_structure)
   except ValueError as e:
     raise ValueError(
-        '`metrics_constructor` must return a `tf.keras.metrics.Metric` '
+        '`metrics_constructor` must return a `tf_keras.metrics.Metric` or a `keras.metrics.Metric`'
         'instance, or an OrderedDict of string to keras metrics.'
     ) from e
   if isinstance(metrics_structure, collections.OrderedDict):
@@ -125,7 +132,7 @@ def create_functional_metric_fns(
   del metrics_structure
 
   # IMPORTANT: the following code relies on the order of the `tf.Variable`s in
-  # `tf.keras.metrics.Metric.variables` to match the order that they are created
+  # `tf_keras.metrics.Metric.variables` to match the order that they are created
   # at runtime. If this changes, `build_replace_variable_with_parameter_creator`
   # will yield the wrong parameters in `update` and `finalize` calls.
   #
@@ -156,7 +163,8 @@ def create_functional_metric_fns(
       )
     nonlocal variable_creation_indices
     variable_creation_indices = [
-        tensor_variable.index
+        tensor_variable.value.index if keras_compat.is_keras3(tensor_variable)
+        else tensor_variable.index
         for tensor_variable in tf.nest.flatten(tensor_variable_structure)
     ]
     return tensor_variable_structure
@@ -225,7 +233,7 @@ def create_functional_metric_fns(
       )
     predictions = batch_output.predictions
 
-    def inner_update(metric: tf.keras.metrics.Metric) -> tuple[tf.Tensor, ...]:
+    def inner_update(metric: Metrics) -> tuple[tf.Tensor, ...]:
       # We must unwrap `update_state` here because the `TensorVariable` is
       # created in the outer `update` FuncGraph and since it is not constant
       # it can't be closed over in the `update_state` FuncGraph. The

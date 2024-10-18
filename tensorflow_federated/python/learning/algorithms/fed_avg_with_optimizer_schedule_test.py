@@ -17,6 +17,8 @@ from unittest import mock
 from absl.testing import absltest
 from absl.testing import parameterized
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.core.test import static_assert
 from tensorflow_federated.python.learning import dataset_reduce
@@ -26,22 +28,46 @@ from tensorflow_federated.python.learning.metrics import aggregator
 from tensorflow_federated.python.learning.models import model_examples
 from tensorflow_federated.python.learning.models import test_models
 from tensorflow_federated.python.learning.optimizers import sgdm
+from tensorflow_federated.python.common_libs import keras_compat
 
 
 class ClientScheduledFedAvgTest(parameterized.TestCase):
 
   @parameterized.product(
       optimizer_fn=[
-          lambda x: tf.keras.optimizers.SGD(learning_rate=x),
+          lambda x: tf_keras.optimizers.SGD(learning_rate=x),
           lambda x: sgdm.build_sgdm(learning_rate=x),
       ],
       aggregation_factory=[
           model_update_aggregator.robust_aggregator,
-          model_update_aggregator.compression_aggregator,
           model_update_aggregator.secure_aggregator,
       ],
   )
   def test_construction_calls_model_fn(self, optimizer_fn, aggregation_factory):
+    # Assert that the process building does not call `model_fn` too many times.
+    # `model_fn` can potentially be expensive (loading weights, processing, etc
+    # ).
+    learning_rate_fn = lambda x: 0.1
+    mock_model_fn = mock.Mock(side_effect=model_examples.LinearRegression)
+    fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
+        model_fn=mock_model_fn,
+        client_learning_rate_fn=learning_rate_fn,
+        client_optimizer_fn=optimizer_fn,
+        model_aggregator=aggregation_factory(),
+    )
+    self.assertEqual(mock_model_fn.call_count, 3)
+
+  @parameterized.product(
+      optimizer_fn=[
+          lambda x: keras.optimizers.SGD(learning_rate=x),
+          lambda x: sgdm.build_sgdm(learning_rate=x),
+      ],
+      aggregation_factory=[
+          model_update_aggregator.robust_aggregator,
+          model_update_aggregator.secure_aggregator,
+      ],
+  )
+  def test_construction_calls_model_fn_keras3(self, optimizer_fn, aggregation_factory):
     # Assert that the process building does not call `model_fn` too many times.
     # `model_fn` can potentially be expensive (loading weights, processing, etc
     # ).
@@ -74,7 +100,31 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
   )
   def test_client_tf_dataset_reduce_fn(self, use_simulation, mock_reduce):
     client_learning_rate_fn = lambda x: 0.5
-    client_optimizer_fn = tf.keras.optimizers.SGD
+    client_optimizer_fn = tf_keras.optimizers.SGD
+    fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
+        model_fn=model_examples.LinearRegression,
+        client_learning_rate_fn=client_learning_rate_fn,
+        client_optimizer_fn=client_optimizer_fn,
+        use_experimental_simulation_loop=use_simulation,
+    )
+
+    if use_simulation:
+      mock_reduce.assert_not_called()
+    else:
+      mock_reduce.assert_called()
+
+  @parameterized.named_parameters(
+      ('non_simulation', False),
+      ('simulation', True),
+  )
+  @mock.patch.object(
+      dataset_reduce,
+      '_dataset_reduce_fn',
+      wraps=dataset_reduce._dataset_reduce_fn,
+  )
+  def test_client_tf_dataset_reduce_fn_keras3(self, use_simulation, mock_reduce):
+    client_learning_rate_fn = lambda x: 0.5
+    client_optimizer_fn = keras.optimizers.SGD
     fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
         model_fn=model_examples.LinearRegression,
         client_learning_rate_fn=client_learning_rate_fn,
@@ -88,12 +138,16 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
       mock_reduce.assert_called()
 
   @parameterized.named_parameters([
-      ('keras_optimizer', lambda x: tf.keras.optimizers.SGD()),
+      ('keras_optimizer', lambda x: tf_keras.optimizers.SGD()),
+      ('keras3_optimizer', lambda x: keras.optimizers.SGD()),
       ('tff_optimizer', lambda x: sgdm.build_sgdm()),
   ])
   def test_construction_calls_client_learning_rate_fn(self, optimizer_fn):
     mock_learning_rate_fn = mock.Mock(side_effect=lambda x: 1.0)
-    optimizer_fn = tf.keras.optimizers.SGD
+    if keras_compat.is_keras3(optimizer_fn):
+      optimizer_fn = keras.optimizers.SGD
+    else:
+      optimizer_fn = tf_keras.optimizers.SGD
     fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
         model_fn=model_examples.LinearRegression,
         client_learning_rate_fn=mock_learning_rate_fn,
@@ -106,7 +160,8 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
     self.assertEqual(mock_learning_rate_fn.call_count, 2)
 
   @parameterized.named_parameters([
-      ('keras_optimizer', lambda x: tf.keras.optimizers.SGD()),
+      ('keras_optimizer', lambda x: tf_keras.optimizers.SGD()),
+      ('keras3_optimizer', lambda x: keras.optimizers.SGD()),
       ('tff_optimizer', lambda x: sgdm.build_sgdm()),
   ])
   def test_construction_calls_client_optimizer_fn(self, optimizer_fn):
@@ -126,8 +181,22 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
 
   def test_construction_calls_server_optimizer_fn(self):
     learning_rate_fn = lambda x: 0.5
-    client_optimizer_fn = tf.keras.optimizers.SGD
-    mock_server_optimizer_fn = mock.Mock(side_effect=tf.keras.optimizers.SGD)
+    client_optimizer_fn = tf_keras.optimizers.SGD
+    mock_server_optimizer_fn = mock.Mock(side_effect=tf_keras.optimizers.SGD)
+
+    fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
+        model_fn=model_examples.LinearRegression,
+        client_learning_rate_fn=learning_rate_fn,
+        client_optimizer_fn=client_optimizer_fn,
+        server_optimizer_fn=mock_server_optimizer_fn,
+    )
+
+    mock_server_optimizer_fn.assert_called()
+
+  def test_construction_calls_server_optimizer_fn_keras3(self):
+    learning_rate_fn = lambda x: 0.5
+    client_optimizer_fn = keras.optimizers.SGD
+    mock_server_optimizer_fn = mock.Mock(side_effect=keras.optimizers.SGD)
 
     fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
         model_fn=model_examples.LinearRegression,
@@ -139,7 +208,8 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
     mock_server_optimizer_fn.assert_called()
 
   @parameterized.named_parameters([
-      ('keras_optimizer', lambda x: tf.keras.optimizers.SGD()),
+      ('keras_optimizer', lambda x: tf_keras.optimizers.SGD()),
+      ('keras3_optimizer', lambda x: keras.optimizers.SGD()),
       ('tff_optimizer', lambda x: sgdm.build_sgdm()),
   ])
   def test_constructs_with_non_constant_learning_rate(self, optimizer_fn):
@@ -153,7 +223,8 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
     )
 
   @parameterized.named_parameters([
-      ('keras_optimizer', lambda x: tf.keras.optimizers.SGD()),
+      ('keras_optimizer', lambda x: tf_keras.optimizers.SGD()),
+      ('keras3_optimizer', lambda x: keras.optimizers.SGD()),
       ('tff_optimizer', lambda x: sgdm.build_sgdm()),
   ])
   def test_constructs_with_tf_function(self, optimizer_fn):
@@ -175,7 +246,15 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
       fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
           model_fn=model_examples.LinearRegression(),
           client_learning_rate_fn=lambda x: 0.1,
-          client_optimizer_fn=tf.keras.optimizers.SGD,
+          client_optimizer_fn=tf_keras.optimizers.SGD,
+      )
+
+  def test_raises_on_non_callable_model_fn_keras3(self):
+    with self.assertRaises(TypeError):
+      fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
+          model_fn=model_examples.LinearRegression(),
+          client_learning_rate_fn=lambda x: 0.1,
+          client_optimizer_fn=keras.optimizers.SGD,
       )
 
   def test_construction_with_only_secure_aggregation(self):
@@ -183,7 +262,22 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
     learning_process = fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
         model_fn,
         client_learning_rate_fn=lambda x: 0.5,
-        client_optimizer_fn=tf.keras.optimizers.SGD,
+        client_optimizer_fn=tf_keras.optimizers.SGD,
+        model_aggregator=model_update_aggregator.secure_aggregator(
+            weighted=True
+        ),
+        metrics_aggregator=aggregator.secure_sum_then_finalize,
+    )
+    static_assert.assert_not_contains_unsecure_aggregation(
+        learning_process.next
+    )
+
+  def test_construction_with_only_secure_aggregation_keras3(self):
+    model_fn = model_examples.LinearRegression
+    learning_process = fed_avg_with_optimizer_schedule.build_weighted_fed_avg_with_optimizer_schedule(
+        model_fn,
+        client_learning_rate_fn=lambda x: 0.5,
+        client_optimizer_fn=keras.optimizers.SGD,
         model_aggregator=model_update_aggregator.secure_aggregator(
             weighted=True
         ),
@@ -194,7 +288,8 @@ class ClientScheduledFedAvgTest(parameterized.TestCase):
     )
 
   @parameterized.named_parameters([
-      ('keras_optimizer', lambda x: tf.keras.optimizers.SGD()),
+      ('keras_optimizer', lambda x: tf_keras.optimizers.SGD()),
+      ('keras3_optimizer', lambda x: keras.optimizers.SGD()),
       ('tff_optimizer', lambda x: sgdm.build_sgdm()),
   ])
   def test_measurements_include_client_learning_rate(self, optimizer_fn):

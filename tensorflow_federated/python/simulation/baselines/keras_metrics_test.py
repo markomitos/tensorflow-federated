@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import tensorflow as tf
+import tf_keras
 
 from tensorflow_federated.python.simulation.baselines import keras_metrics
 
@@ -22,7 +23,7 @@ class NumTokensCounterTest(tf.test.TestCase):
   def test_constructor_no_masked_token(self):
     metric_name = 'my_test_metric'
     metric = keras_metrics.NumTokensCounter(name=metric_name)
-    self.assertIsInstance(metric, tf.keras.metrics.Metric)
+    self.assertIsInstance(metric, tf_keras.metrics.Metric)
     self.assertEqual(metric.name, metric_name)
     self.assertEqual(self.evaluate(metric.result()), 0)
 
@@ -66,7 +67,7 @@ class MaskedCategoricalAccuracyTest(tf.test.TestCase):
   def test_constructor_no_masked_token(self):
     metric_name = 'my_test_metric'
     metric = keras_metrics.MaskedCategoricalAccuracy(name=metric_name)
-    self.assertIsInstance(metric, tf.keras.metrics.Metric)
+    self.assertIsInstance(metric, tf_keras.metrics.Metric)
     self.assertEqual(metric.name, metric_name)
     self.assertAllEqual(metric.get_config()['masked_tokens'], [])
     self.assertEqual(self.evaluate(metric.result()), 0.0)
@@ -76,7 +77,7 @@ class MaskedCategoricalAccuracyTest(tf.test.TestCase):
     metric = keras_metrics.MaskedCategoricalAccuracy(
         name=metric_name, masked_tokens=[100]
     )
-    self.assertIsInstance(metric, tf.keras.metrics.Metric)
+    self.assertIsInstance(metric, tf_keras.metrics.Metric)
     self.assertEqual(metric.name, metric_name)
     self.assertAllEqual(metric.get_config()['masked_tokens'], [100])
     self.assertEqual(self.evaluate(metric.result()), 0.0)

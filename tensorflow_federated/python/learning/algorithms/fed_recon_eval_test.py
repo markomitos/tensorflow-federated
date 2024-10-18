@@ -20,6 +20,8 @@ from absl.testing import parameterized
 import attrs
 import numpy as np
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.core.backends.native import execution_contexts
 from tensorflow_federated.python.core.environments.tensorflow_frontend import tensorflow_computation
@@ -108,7 +110,7 @@ class LinearModel(reconstruction_model.ReconstructionModel):
     )
 
 
-class BiasLayer(tf.keras.layers.Layer):
+class BiasLayer(tf_keras.layers.Layer):
   """Adds a bias to inputs."""
 
   def build(self, input_shape):
@@ -120,14 +122,26 @@ class BiasLayer(tf.keras.layers.Layer):
     return x + self.bias
 
 
+class Keras3BiasLayer(keras.layers.Layer):
+  """Adds a bias to inputs."""
+
+  def build(self, input_shape):
+    self.bias = self.add_weight(
+        name='bias', shape=input_shape[1:], initializer='zeros', trainable=True
+    )
+
+  def call(self, x):
+    return x + self.bias
+
+
 def keras_linear_model_fn():
   """Should produce the same results as `LinearModel`."""
-  inputs = tf.keras.layers.Input(shape=[1])
-  scaled_input = tf.keras.layers.Dense(
+  inputs = tf_keras.layers.Input(shape=[1])
+  scaled_input = tf_keras.layers.Dense(
       1, use_bias=False, kernel_initializer='zeros'
   )(inputs)
   outputs = BiasLayer()(scaled_input)
-  keras_model = tf.keras.Model(inputs=inputs, outputs=outputs)
+  keras_model = tf_keras.Model(inputs=inputs, outputs=outputs)
   input_spec = _create_input_spec()
   return reconstruction_model.ReconstructionModel.from_keras_model_and_layers(
       keras_model=keras_model,
@@ -137,8 +151,50 @@ def keras_linear_model_fn():
   )
 
 
-class NumOverCounter(tf.keras.metrics.Sum):
-  """A `tf.keras.metrics.Metric` that counts examples greater than a constant.
+def keras3_linear_model_fn():
+  """Should produce the same results as `LinearModel`."""
+  inputs = keras.layers.Input(shape=[1])
+  scaled_input = keras.layers.Dense(
+      1, use_bias=False, kernel_initializer='zeros'
+  )(inputs)
+  outputs = Keras3BiasLayer()(scaled_input)
+  keras_model = keras.Model(inputs=inputs, outputs=outputs)
+  input_spec = _create_input_spec()
+  return reconstruction_model.ReconstructionModel.from_keras_model_and_layers(
+      keras_model=keras_model,
+      global_layers=keras_model.layers[:-1],
+      local_layers=keras_model.layers[-1:],
+      input_spec=input_spec,
+  )
+
+
+
+class NumOverCounter(tf_keras.metrics.Sum):
+  """A `tf_keras.metrics.Metric` that counts examples greater than a constant.
+
+  This metric counts label examples greater than a threshold.
+  """
+
+  def __init__(
+      self, threshold: float, name: str = 'num_over', dtype=tf.float32
+  ):
+    super().__init__(name, dtype)
+    self.threshold = threshold
+
+  def update_state(self, y_true, y_pred, sample_weight=None):
+    num_over = tf.reduce_sum(
+        tf.cast(tf.greater(y_true, self.threshold), tf.float32)
+    )
+    return super().update_state(num_over)
+
+  def get_config(self):
+    config = {'threshold': self.threshold}
+    base_config = super().get_config()
+    return dict(list(base_config.items()) + list(config.items()))
+
+
+class Keras3NumOverCounter(keras.metrics.Sum):
+  """A `keras.metrics.Metric` that counts examples greater than a constant.
 
   This metric counts label examples greater than a threshold.
   """
@@ -180,8 +236,11 @@ def _get_tff_optimizer(learning_rate=0.1):
 
 
 def _get_keras_optimizer_fn(learning_rate=0.1):
-  return lambda: tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  return lambda: tf_keras.optimizers.SGD(learning_rate=learning_rate)
 
+
+def _get_keras3_optimizer_fn(learning_rate=0.1):
+  return lambda: keras.optimizers.SGD(learning_rate=learning_rate)
 
 class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
 
@@ -197,10 +256,124 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_no_split_data(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
+
+    dataset_split_fn = (
+        reconstruction_model.ReconstructionModel.build_dataset_split_fn()
+    )
+
+    evaluate = fed_recon_eval.build_fed_recon_eval(
+        model_fn,
+        loss_fn=loss_fn,
+        metrics_fn=metrics_fn,
+        reconstruction_optimizer_fn=optimizer_fn(),
+        dataset_split_fn=dataset_split_fn,
+    )
+    global_weights_type = reconstruction_model.global_weights_type_from_model(
+        model_fn()
+    )
+    state_type = computation_types.FederatedType(
+        LearningAlgorithmState(
+            global_model_weights=global_weights_type,
+            distributor=(),
+            client_work=(
+                (),
+                collections.OrderedDict(
+                    num_examples=[np.int64],
+                    num_over=[np.float32],
+                    loss=[np.float32, np.float32],
+                ),
+            ),
+            aggregator=collections.OrderedDict(
+                value_sum_process=(), weight_sum_process=()
+            ),
+            finalizer=(),
+        ),
+        placements.SERVER,
+    )
+    type_test_utils.assert_types_identical(
+        evaluate.next.type_signature,
+        FunctionType(
+            parameter=collections.OrderedDict(
+                state=state_type,
+                client_data=computation_types.FederatedType(
+                    SequenceType(
+                        collections.OrderedDict(
+                            x=TensorType(np.float32, [None, 1]),
+                            y=TensorType(np.float32, [None, 1]),
+                        )
+                    ),
+                    placements.CLIENTS,
+                ),
+            ),
+            result=LearningProcessOutput(
+                state=state_type,
+                metrics=computation_types.FederatedType(
+                    collections.OrderedDict(
+                        distributor=(),
+                        client_work=collections.OrderedDict(
+                            eval=collections.OrderedDict(
+                                current_round_metrics=collections.OrderedDict(
+                                    num_examples=np.int64,
+                                    num_over=np.float32,
+                                    loss=np.float32,
+                                ),
+                                total_rounds_metrics=collections.OrderedDict(
+                                    num_examples=np.int64,
+                                    num_over=np.float32,
+                                    loss=np.float32,
+                                ),
+                            )
+                        ),
+                        aggregator=collections.OrderedDict(
+                            mean_value=(), mean_weight=()
+                        ),
+                        finalizer=(),
+                    ),
+                    placements.SERVER,
+                ),
+            ),
+        ),
+    )
+
+    state = evaluate.initialize()
+    # Explicitly set weights for testing assertions below.
+    state = evaluate.set_model_weights(
+        state,
+        reconstruction_model.model_weights.ModelWeights(
+            trainable=(tf.convert_to_tensor([[1.0]]),), non_trainable=()
+        ),
+    )
+    _, result = evaluate.next(state, create_client_data())
+    eval_result = result['client_work']['eval']['current_round_metrics']
+
+    # Ensure loss isn't equal to the value we'd expect if no reconstruction
+    # happens. We can calculate this since the local bias is initialized at 0
+    # and not reconstructed. MSE is (y - 1 * x)^2 for each example, for a mean
+    # of (4^2 + 4^2 + 5^2 + 4^2 + 3^2 + 6^2) / 6 = 59/3.
+    self.assertNotAlmostEqual(eval_result['loss'], 19.666666)
+    self.assertAlmostEqual(eval_result['num_examples'], 6.0)
+    self.assertAlmostEqual(eval_result['num_over'], 3.0)
+
+  @parameterized.named_parameters(
+      ('non_keras_model_with_keras_opt', LinearModel, _get_keras3_optimizer_fn),
+      ('non_keras_model_with_tff_opt', LinearModel, _get_tff_optimizer),
+      (
+          'keras_model_with_keras_opt',
+          keras3_linear_model_fn,
+          _get_keras3_optimizer_fn,
+      ),
+      ('keras_model_with_tff_opt', keras3_linear_model_fn, _get_tff_optimizer),
+  )
+  def test_federated_reconstruction_no_split_data_keras3(self, model_fn, optimizer_fn):
+    def loss_fn():
+      return keras.losses.MeanSquaredError()
+
+    def metrics_fn():
+      return [counters.Keras3NumExamplesCounter(), Keras3NumOverCounter(5.0)]
 
     dataset_split_fn = (
         reconstruction_model.ReconstructionModel.build_dataset_split_fn()
@@ -311,7 +484,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_split_data(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -411,7 +584,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       self, model_fn, optimizer_fn
   ):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -518,7 +691,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_recon_lr_0(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -631,7 +804,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_federated_reconstruction_skip_recon(self, model_fn, optimizer_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -744,7 +917,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
       self, model_fn, optimizer_fn
   ):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     dataset_split_fn = (
         reconstruction_model.ReconstructionModel.build_dataset_split_fn(
@@ -839,7 +1012,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
   )
   def test_fed_recon_eval_custom_stateful_broadcaster(self, model_fn):
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     def metrics_fn():
       return [counters.NumExamplesCounter(), NumOverCounter(5.0)]
@@ -967,7 +1140,7 @@ class FedreconEvaluationTest(tf.test.TestCase, parameterized.TestCase):
     mock_model_fn = mock.Mock(side_effect=keras_linear_model_fn)
 
     def loss_fn():
-      return tf.keras.losses.MeanSquaredError()
+      return tf_keras.losses.MeanSquaredError()
 
     fed_recon_eval.build_fed_recon_eval(model_fn=mock_model_fn, loss_fn=loss_fn)
     # TODO: b/186451541 - Reduce the number of calls to model_fn.

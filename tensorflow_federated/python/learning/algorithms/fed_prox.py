@@ -26,6 +26,8 @@ from typing import Optional, Union
 from absl import logging
 import numpy as np
 import tensorflow as tf
+import tf_keras
+import keras
 
 from tensorflow_federated.python.aggregators import factory
 from tensorflow_federated.python.aggregators import factory_utils
@@ -46,7 +48,7 @@ from tensorflow_federated.python.learning.templates import distributors
 from tensorflow_federated.python.learning.templates import learning_process
 from tensorflow_federated.python.learning.templates import proximal_client_work
 
-DEFAULT_SERVER_OPTIMIZER_FN = lambda: tf.keras.optimizers.SGD(learning_rate=1.0)
+DEFAULT_SERVER_OPTIMIZER_FN = lambda: tf_keras.optimizers.SGD(learning_rate=1.0)
 
 
 def build_weighted_fed_prox(
@@ -55,10 +57,14 @@ def build_weighted_fed_prox(
     ],
     proximal_strength: float,
     client_optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer,
+        Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer]
     ],
     server_optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer,
+        Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer]
     ] = DEFAULT_SERVER_OPTIMIZER_FN,
     client_weighting: Optional[
         client_weight_lib.ClientWeighting
@@ -108,7 +114,7 @@ def build_weighted_fed_prox(
   delta is applied at the server using a server optimizer, as in the FedOpt
   framework proposed in [Reddi et al., 2021](https://arxiv.org/abs/2003.00295).
 
-  Note: The default server optimizer function is `tf.keras.optimizers.SGD`
+  Note: The default server optimizer function is `tf_keras.optimizers.SGD`
   with a learning rate of 1.0, which corresponds to adding the model delta to
   the current server model. This recovers the original FedProx algorithm in
   [Li et al., 2020](https://arxiv.org/abs/1812.06127). More
@@ -128,10 +134,10 @@ def build_weighted_fed_prox(
       FedAvg. Higher values prevent clients from moving too far from the server
       model during local training.
     client_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`.
+      callable that returns a `tf_keras.Optimizer` or a `keras.Optimizer`.
     server_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`. By default, this uses
-      `tf.keras.optimizers.SGD` with a learning rate of 1.0.
+      callable that returns a `tf_keras.Optimizer` or a `keras.Optimizer`.
+      By default, this uses `tf_keras.optimizers.SGD` with a learning rate of 1.0.
     client_weighting: A member of `tff.learning.ClientWeighting` that specifies
       a built-in weighting method. By default, weighting by number of examples
       is used.
@@ -264,10 +270,14 @@ def build_unweighted_fed_prox(
     ],
     proximal_strength: float,
     client_optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer,
+        Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer]
     ],
     server_optimizer_fn: Union[
-        optimizer_base.Optimizer, Callable[[], tf.keras.optimizers.Optimizer]
+        optimizer_base.Optimizer,
+        Callable[[], tf_keras.optimizers.Optimizer],
+        Callable[[], keras.optimizers.Optimizer]
     ] = DEFAULT_SERVER_OPTIMIZER_FN,
     model_distributor: Optional[distributors.DistributionProcess] = None,
     model_aggregator: Optional[factory.UnweightedAggregationFactory] = None,
@@ -314,7 +324,7 @@ def build_unweighted_fed_prox(
   a server optimizer, as in the FedOpt framework proposed in
   [Reddi et al., 2021](https://arxiv.org/abs/2003.00295).
 
-  Note: The default server optimizer function is `tf.keras.optimizers.SGD`
+  Note: The default server optimizer function is `tf_keras.optimizers.SGD`
   with a learning rate of 1.0, which corresponds to adding the model delta to
   the current server model. This recovers the original FedProx algorithm in
   [Li et al., 2020](https://arxiv.org/abs/1812.06127). More
@@ -334,10 +344,10 @@ def build_unweighted_fed_prox(
       FedAvg. Higher values prevent clients from moving too far from the server
       model during local training.
     client_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`.
+      callable that returns a `tf_keras.Optimizer` or a `keras.Optimizer`.
     server_optimizer_fn: A `tff.learning.optimizers.Optimizer`, or a no-arg
-      callable that returns a `tf.keras.Optimizer`. By default, this uses
-      `tf.keras.optimizers.SGD` with a learning rate of 1.0.
+      callable that returns a `tf_keras.Optimizer` or a `keras.Optimizer`.
+      By default, this uses`tf_keras.optimizers.SGD` with a learning rate of 1.0.
     model_distributor: An optional `DistributionProcess` that broadcasts the
       model weights on the server to the clients. If set to `None`, the
       distributor is constructed via `distributors.build_broadcast_process`.

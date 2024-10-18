@@ -19,6 +19,8 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow as tf
 import tensorflow_federated as tff
+import tf_keras
+import keras
 
 from tensorflow_federated.python.tests import temperature_sensor_example
 from tensorflow_federated.python.tests import test_contexts
@@ -567,6 +569,49 @@ class KerasIntegrationTest(parameterized.TestCase):
 
   @tff.test.with_contexts(*test_contexts.get_all_contexts())
   def test_keras_model_with_activity_regularization_runs_fedavg(self):
+    #self.skipTest('b/171358068')
+
+    num_clients = 5
+
+    x_train = np.zeros([100, 100]).astype(np.float16)
+    x_train_clients = np.array_split(x_train, num_clients)
+
+    def map_fn(example):
+      return collections.OrderedDict(x=example, y=example)
+
+    def client_data(n):
+      ds = tf.data.Dataset.from_tensor_slices(x_train_clients[n])
+      return ds.batch(128).map(map_fn)
+
+    train_data = [client_data(n) for n in range(num_clients)]
+    input_spec = train_data[0].element_spec
+    input_dim = x_train.shape[1]
+
+    def model_fn():
+      model = tf_keras.models.Sequential([
+          tf_keras.layers.InputLayer(input_shape=(input_dim,)),
+          tf_keras.layers.Dense(
+              50, activity_regularizer=tf_keras.regularizers.l1(0.1)
+          ),
+          tf_keras.layers.Dense(input_dim, activation='sigmoid'),
+      ])
+      tff_model = tff.learning.models.from_keras_model(
+          keras_model=model,
+          input_spec=input_spec,
+          loss=tf_keras.losses.MeanSquaredError(),
+      )
+      return tff_model
+
+    trainer = tff.learning.algorithms.build_weighted_fed_avg(
+        model_fn, client_optimizer_fn=lambda: tf_keras.optimizers.SGD(0.1)
+    )
+
+    state = trainer.initialize()
+    for _ in range(2):
+      state = trainer.next(state, train_data).state
+
+  @tff.test.with_contexts(*test_contexts.get_all_contexts())
+  def test_keras3_model_with_activity_regularization_runs_fedavg(self):
     self.skipTest('b/171358068')
 
     num_clients = 5
@@ -586,22 +631,22 @@ class KerasIntegrationTest(parameterized.TestCase):
     input_dim = x_train.shape[1]
 
     def model_fn():
-      model = tf.keras.models.Sequential([
-          tf.keras.layers.InputLayer(input_shape=(input_dim,)),
-          tf.keras.layers.Dense(
-              50, activity_regularizer=tf.keras.regularizers.l1(0.1)
+      model = keras.models.Sequential([
+          keras.layers.InputLayer(input_shape=(input_dim,)),
+          keras.layers.Dense(
+              50, activity_regularizer=keras.regularizers.l1(0.1)
           ),
-          tf.keras.layers.Dense(input_dim, activation='sigmoid'),
+          keras.layers.Dense(input_dim, activation='sigmoid'),
       ])
       tff_model = tff.learning.models.from_keras_model(
           keras_model=model,
           input_spec=input_spec,
-          loss=tf.keras.losses.MeanSquaredError(),
+          loss=keras.losses.MeanSquaredError(),
       )
       return tff_model
 
     trainer = tff.learning.algorithms.build_weighted_fed_avg(
-        model_fn, client_optimizer_fn=lambda: tf.keras.optimizers.SGD(0.1)
+        model_fn, client_optimizer_fn=lambda: keras.optimizers.SGD(0.1)
     )
 
     state = trainer.initialize()

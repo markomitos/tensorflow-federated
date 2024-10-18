@@ -1,0 +1,43 @@
+{
+    "bazel-cpp-tools.compileCommands.targets": [
+        "//tensorflow_federated/cc/...",
+        "//tensorflow_federated/proto/..."
+    ],
+    "clangd.arguments": [
+        "--header-insertion=never",
+        "--compile-commands-dir=${workspaceFolder}/",
+        "--query-driver=**"
+    ],
+    "pylint.args": [
+        "--rcfile=.pylintrc"
+    ],
+    "python.analysis.extraPaths": [
+        "bazel-bin",
+    ],
+    "python.analysis.ignore": [
+        "bazel-*",
+    ],
+    "python.analysis.exclude": [
+        "**/__pycache__",
+        "**/.git"
+    ],
+    "[cpp]": {
+        "editor.suggest.insertMode": "replace",
+        "editor.semanticHighlighting.enabled": true,
+        "editor.formatOnSave": true,
+    },
+    "editor.wordBasedSuggestions": "off",
+    "files.exclude": {
+        ".idea": true,
+        ".ijwb": true,
+        ".clwb": true,
+        ".cache": true,
+        "*.egg-info": true,
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+    },
+}
